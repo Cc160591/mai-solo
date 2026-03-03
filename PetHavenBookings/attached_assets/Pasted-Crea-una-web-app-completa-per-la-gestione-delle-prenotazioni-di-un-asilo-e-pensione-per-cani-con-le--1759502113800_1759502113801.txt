@@ -1,0 +1,110 @@
+Crea una web app completa per la gestione delle prenotazioni di un asilo e pensione per cani con le seguenti specifiche:
+Requisiti Tecnici di Base
+
+Stack: Node.js + Express per il backend, HTML/CSS/JavaScript vanilla per il frontend
+Database: SQLite (file persistente database.sqlite che non viene sovrascritto agli aggiornamenti)
+Nessun sistema di autenticazione richiesto - accesso diretto tramite link
+
+Funzionalità Core
+1. Sistema di Prenotazione
+
+Servizi disponibili: Asilo (giornaliero) e Pensione (multipli giorni)
+Capacità: Massimo 5 posti disponibili per ogni giorno
+Orario operativo: Lunedì-Domenica, 8:00-18:00
+Restrizione: Non permettere prenotazioni per il giorno corrente (solo da domani in poi)
+
+2. Orari Fissi di Entrata/Uscita
+Entrata:
+
+Mattino: 8:00-9:00
+Pomeriggio: 13:30-14:00
+
+Uscita:
+
+Pranzo: 11:30-12:00
+Sera: 17:00-18:00
+
+3. Form di Prenotazione
+Campi richiesti:
+
+Nome del cane (obbligatorio)
+Nome del proprietario (obbligatorio)
+Tipo di servizio: Asilo / Pensione (radio button)
+Data inizio (date picker - minimo domani)
+Data fine (solo per pensione, opzionale per asilo)
+Orario di entrata (dropdown con fasce orarie disponibili)
+Orario di uscita (dropdown con fasce orarie disponibili)
+
+4. Visualizzazione Disponibilità
+
+Calendario mensile che mostra per ogni giorno i posti rimanenti (1-5)
+Indicatore visivo:
+
+Verde: 3-5 posti disponibili
+Giallo: 2 posti disponibili
+Rosso: 1 posto disponibile
+Grigio: 0 posti (completo)
+
+
+Lista delle prenotazioni del giorno selezionato (visibile a tutti)
+
+5. Database Schema (SQLite)
+Crea tabella bookings con:
+
+id (INTEGER PRIMARY KEY AUTOINCREMENT)
+dog_name (TEXT)
+owner_name (TEXT)
+service_type (TEXT) - 'asilo' o 'pensione'
+start_date (DATE)
+end_date (DATE)
+entry_time (TEXT)
+exit_time (TEXT)
+created_at (TIMESTAMP)
+
+6. Logica di Validazione
+
+Verificare disponibilità posti prima di confermare prenotazione
+Per prenotazioni multiple giorni (pensione): verificare disponibilità per OGNI giorno del range
+Bloccare prenotazioni se anche solo un giorno nel range è pieno
+Mostrare messaggio di errore chiaro se non ci sono posti disponibili
+
+7. UI/UX
+
+Design responsive (mobile-friendly)
+Interfaccia pulita e intuitiva
+Feedback visivo immediato sulle azioni (successo/errore)
+Conferma prenotazione con riepilogo dettagli
+Calendario interattivo per navigare tra i mesi
+
+Persistenza Dati
+IMPORTANTE: Il file database.sqlite deve essere persistente. Implementa un check all'avvio:
+
+Se il database esiste → usalo senza modifiche
+Se non esiste → crealo con le tabelle necessarie
+NON sovrascrivere mai il database esistente durante gli aggiornamenti del codice
+
+Struttura File Suggerita
+/
+├── server.js (Express server + API endpoints)
+├── database.js (gestione SQLite + inizializzazione)
+├── public/
+│   ├── index.html
+│   ├── style.css
+│   └── script.js
+├── database.sqlite (auto-generato, persistente)
+└── package.json
+Endpoint API Necessari
+
+GET /api/availability/:date - Posti disponibili per una data
+GET /api/bookings/:date - Lista prenotazioni per una data
+POST /api/bookings - Crea nuova prenotazione
+GET /api/calendar/:year/:month - Dati calendario mensile
+
+Note Implementative
+
+Usa better-sqlite3 per SQLite sincrono
+Valida tutte le date server-side
+Gestisci i fusi orari per evitare problemi con "domani"
+Aggiungi logs per debugging delle prenotazioni
+
+Crea un'applicazione completa, funzionante e pronta per l'uso in produzione.

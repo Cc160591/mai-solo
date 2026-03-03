@@ -1,0 +1,125 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(270, 50%, 98%);
+  --foreground: hsl(215, 20%, 15%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(215, 20%, 15%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(215, 20%, 15%);
+  --primary: hsl(270, 60%, 50%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(270, 40%, 30%);
+  --secondary-foreground: hsl(0, 0%, 100%);
+  --muted: hsl(270, 50%, 95%);
+  --muted-foreground: hsl(270, 20%, 45%);
+  --accent: hsl(320, 45%, 60%);
+  --accent-foreground: hsl(0, 0%, 100%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --border: hsl(270, 30%, 90%);
+  --input: hsl(270, 30%, 90%);
+  --ring: hsl(270, 60%, 50%);
+  --chart-1: hsl(270, 60%, 50%);
+  --chart-2: hsl(270, 55%, 70%);
+  --chart-3: hsl(320, 45%, 60%);
+  --chart-4: hsl(270, 45%, 65%);
+  --chart-5: hsl(280, 50%, 55%);
+  --sidebar: hsl(0, 0%, 100%);
+  --sidebar-foreground: hsl(215, 20%, 15%);
+  --sidebar-primary: hsl(270, 60%, 50%);
+  --sidebar-primary-foreground: hsl(0, 0%, 100%);
+  --sidebar-accent: hsl(270, 50%, 95%);
+  --sidebar-accent-foreground: hsl(270, 60%, 50%);
+  --sidebar-border: hsl(270, 30%, 90%);
+  --sidebar-ring: hsl(270, 60%, 50%);
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: Menlo, monospace;
+  --radius: 0.5rem;
+  --shadow-2xs: 0px 2px 0px 0px hsl(270, 60%, 50%);
+  --shadow-xs: 0px 2px 0px 0px hsl(270, 60%, 50%);
+  --shadow-sm: 0px 2px 0px 0px hsl(270, 60%, 50%), 0px 1px 2px -1px hsl(270, 60%, 50%);
+  --shadow: 0px 2px 0px 0px hsl(270, 60%, 50%), 0px 1px 2px -1px hsl(270, 60%, 50%);
+  --shadow-md: 0px 2px 0px 0px hsl(270, 60%, 50%), 0px 2px 4px -1px hsl(270, 60%, 50%);
+  --shadow-lg: 0px 2px 0px 0px hsl(270, 60%, 50%), 0px 4px 6px -1px hsl(270, 60%, 50%);
+  --shadow-xl: 0px 2px 0px 0px hsl(270, 60%, 50%), 0px 8px 10px -1px hsl(270, 60%, 50%);
+  --shadow-2xl: 0px 2px 0px 0px hsl(270, 60%, 50%);
+  --tracking-normal: 0em;
+  --spacing: 0.25rem;
+  
+  /* Custom colors for availability */
+  --available-high: hsl(270, 55%, 70%);
+  --available-medium: hsl(320, 45%, 60%);
+  --available-low: hsl(0, 84%, 60%);
+  --available-none: hsl(270, 20%, 45%);
+}
+
+.dark {
+  --background: hsl(270, 40%, 12%);
+  --foreground: hsl(215, 20%, 85%);
+  --card: hsl(270, 35%, 15%);
+  --card-foreground: hsl(0, 0%, 85%);
+  --popover: hsl(270, 40%, 12%);
+  --popover-foreground: hsl(215, 20%, 85%);
+  --primary: hsl(270, 55%, 60%);
+  --primary-foreground: hsl(0, 0%, 100%);
+  --secondary: hsl(270, 50%, 85%);
+  --secondary-foreground: hsl(270, 40%, 20%);
+  --muted: hsl(270, 30%, 18%);
+  --muted-foreground: hsl(270, 15%, 60%);
+  --accent: hsl(320, 50%, 65%);
+  --accent-foreground: hsl(0, 0%, 100%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --border: hsl(270, 25%, 20%);
+  --input: hsl(270, 30%, 18%);
+  --ring: hsl(270, 55%, 60%);
+  --sidebar: hsl(270, 35%, 15%);
+  --sidebar-foreground: hsl(0, 0%, 85%);
+  --sidebar-primary: hsl(270, 55%, 60%);
+  --sidebar-primary-foreground: hsl(0, 0%, 100%);
+  --sidebar-accent: hsl(270, 30%, 18%);
+  --sidebar-accent-foreground: hsl(270, 65%, 75%);
+  --sidebar-border: hsl(270, 25%, 20%);
+  --sidebar-ring: hsl(270, 55%, 60%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .calendar-day {
+    @apply relative border border-border rounded-lg p-2 transition-all duration-200;
+  }
+
+  .calendar-day:hover:not(.disabled) {
+    @apply shadow-md scale-105 cursor-pointer;
+  }
+
+  .calendar-day.disabled {
+    @apply bg-muted opacity-50 cursor-not-allowed;
+  }
+
+  .calendar-day.selected {
+    @apply ring-2 ring-primary shadow-lg;
+  }
+
+  .booking-card {
+    @apply bg-card border border-border rounded-lg p-4 transition-all duration-200 hover:shadow-md;
+  }
+
+  .availability-badge {
+    @apply inline-flex items-center px-2 py-1 rounded-full text-xs font-medium;
+  }
+}
