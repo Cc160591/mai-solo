@@ -38,3 +38,8 @@ outputType = "webview"
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["bash", "-c", "cd PetHavenBookings && npm run start"]
+build = ["bash", "-c", "cd PetHavenBookings && npm run build"]
