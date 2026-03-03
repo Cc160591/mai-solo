@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 import type { Booking } from '@shared/schema';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 interface BookingEmailData {
   dogName: string;
@@ -23,7 +23,7 @@ export async function sendBookingNotification(booking: BookingEmailData): Promis
     return;
   }
 
-  if (!process.env.RESEND_API_KEY || process.env.RESEND_API_KEY.trim() === '') {
+  if (!resend || !process.env.RESEND_API_KEY || process.env.RESEND_API_KEY.trim() === '') {
     console.warn('Email notification skipped: RESEND_API_KEY not configured or empty');
     return;
   }

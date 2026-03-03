@@ -71,7 +71,7 @@ Preferred communication style: Simple, everyday language.
 **Technology Stack:**
 - Node.js with Express
 - TypeScript with ESM modules
-- PostgreSQL with Neon serverless driver (@neondatabase/serverless)
+- PostgreSQL with node-postgres (pg) driver
 - Drizzle ORM for database operations
 - Zod for runtime validation
 
@@ -109,7 +109,7 @@ Preferred communication style: Simple, everyday language.
 ### Data Storage
 
 **Database:**
-- PostgreSQL with Neon serverless driver (asynchronous operations)
+- PostgreSQL with node-postgres (pg) driver (asynchronous operations)
 - Drizzle ORM for type-safe queries
 - Two main tables: `bookings` and `closures`
 
@@ -170,7 +170,7 @@ Preferred communication style: Simple, everyday language.
 ## External Dependencies
 
 **Runtime Dependencies:**
-- `@neondatabase/serverless`: Neon's serverless PostgreSQL driver used for database connections
+- `pg`: Standard PostgreSQL client for Node.js
 - `drizzle-orm`: Type-safe ORM supporting multiple SQL databases
 - `express`: Web server framework
 - `@tanstack/react-query`: Async state management for React
