@@ -85,7 +85,7 @@ export class SQLiteStorage implements IStorage {
 
   async getAvailability(date: string): Promise<{morning: number, afternoon: number}> {
     const bookingsForDate = await this.getBookingsByDate(date);
-    const totalCapacity = 5;
+    const totalCapacity = 9;
     
     // Count bookings for morning (7:30 or 8:00-9:00) and afternoon (13:30-14:00)
     // Pensione occupies both morning and afternoon

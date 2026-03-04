@@ -20,7 +20,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const { morning, afternoon } = await storage.getAvailability(date);
-      res.json({ date, morning, afternoon, total: 5 });
+      res.json({ date, morning, afternoon, total: 9 });
     } catch (error) {
       console.error("Error getting availability:", error);
       res.status(500).json({ message: "Internal server error" });

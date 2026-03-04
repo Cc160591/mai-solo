@@ -512,7 +512,7 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                 <div className="text-sm text-accent-foreground">
                   <p className="font-medium mb-1">Informazioni importanti</p>
                   <ul className="text-xs space-y-1 text-muted-foreground">
-                    <li>• Massimo 5 posti disponibili al giorno</li>
+                    <li>• Massimo 9 posti disponibili al giorno</li>
                     <li>• Verifica la disponibilità nel calendario</li>
                     <li>• Orari di apertura: 8:00-18:00</li>
                   </ul>

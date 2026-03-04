@@ -121,7 +121,7 @@ export default function Calendar({ selectedDate, onDateSelect }: CalendarProps) 
           <div className="flex flex-wrap gap-3 text-xs">
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 bg-green-500 rounded"></div>
-              <span>3-5 posti</span>
+              <span>3-9 posti</span>
             </div>
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 bg-yellow-500 rounded"></div>

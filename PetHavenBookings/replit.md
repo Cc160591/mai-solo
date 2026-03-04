@@ -129,7 +129,7 @@ Preferred communication style: Simple, everyday language.
 ### Business Logic
 
 **Core Rules:**
-- **Half-day capacity management:** 5 spots for morning (7:30 or 8:00-9:00 entry) and 5 spots for afternoon (13:30-14:00 entry) independently
+- **Half-day capacity management:** 9 spots for morning (7:30 or 8:00-9:00 entry) and 9 spots for afternoon (13:30-14:00 entry) independently
 - Two service types: "asilo" (daycare) and "pensione" (boarding)
 - **Weekday restriction for Asilo:** Asilo service is available only Monday-Friday; weekends (Saturday-Sunday) are blocked for asilo bookings
 - **Pensione available all days:** Pensione service can be booked on any day including weekends

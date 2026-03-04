@@ -70,7 +70,7 @@ export default function Home() {
               <p className="text-primary-foreground/90 mb-6">Servizi di asilo giornaliero e pensione per i tuoi amici a quattro zampe</p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
-                  <div className="text-3xl font-bold">5</div>
+                  <div className="text-3xl font-bold">9</div>
                   <div className="text-sm opacity-90">Capacità Max</div>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
