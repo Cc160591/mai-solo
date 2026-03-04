@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import Calendar from "@/components/calendar";
 import BookingForm from "@/components/booking-form";
 import DailyBookings from "@/components/daily-bookings";
 import IdentifyEmailDialog from "@/components/identify-email-dialog";
+import OnboardingTour from "@/components/onboarding-tour";
 import { Button } from "@/components/ui/button";
-import { Shield } from "lucide-react";
+import { Shield, HelpCircle } from "lucide-react";
 
 export default function Home() {
   const [selectedDate, setSelectedDate] = useState<string>(() => {
@@ -16,11 +17,19 @@ export default function Home() {
   });
 
   const [, setLocation] = useLocation();
+  const [showTour, setShowTour] = useState(false);
 
   const { data: adminStatus } = useQuery<{ isAdmin: boolean }>({
     queryKey: ["/api/admin/status"],
     retry: false,
   });
+
+  useEffect(() => {
+    const hasSeenTour = localStorage.getItem("onboardingComplete");
+    if (!hasSeenTour) {
+      setTimeout(() => setShowTour(true), 800);
+    }
+  }, []);
 
   return (
     <div className="bg-background text-foreground antialiased min-h-screen">
@@ -39,6 +48,15 @@ export default function Home() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowTour(true)}
+                className="gap-2 text-muted-foreground"
+              >
+                <HelpCircle className="h-4 w-4" />
+                <span className="hidden sm:inline">Guida</span>
+              </Button>
               {adminStatus?.isAdmin && (
                 <Button
                   variant="outline"
@@ -62,7 +80,7 @@ export default function Home() {
 
       <main className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Hero Section */}
-        <section className="mb-8">
+        <section className="mb-8" data-tour-step="hero">
           <div className="bg-gradient-to-br from-primary via-accent to-primary rounded-2xl p-6 md:p-8 text-primary-foreground shadow-xl relative overflow-hidden">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-white/10 via-transparent to-transparent"></div>
             <div className="relative z-10">
@@ -94,13 +112,17 @@ export default function Home() {
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Left Column: Calendar and Bookings */}
           <div className="lg:col-span-2 space-y-6">
-            <Calendar selectedDate={selectedDate} onDateSelect={setSelectedDate} />
+            <div data-tour-step="calendar">
+              <Calendar selectedDate={selectedDate} onDateSelect={setSelectedDate} />
+            </div>
             <IdentifyEmailDialog />
-            <DailyBookings selectedDate={selectedDate} isAdmin={adminStatus?.isAdmin || false} />
+            <div data-tour-step="daily-bookings">
+              <DailyBookings selectedDate={selectedDate} isAdmin={adminStatus?.isAdmin || false} />
+            </div>
           </div>
 
           {/* Right Column: Booking Form */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1" data-tour-step="booking-form">
             <BookingForm selectedDate={selectedDate} />
           </div>
         </div>
@@ -132,6 +154,8 @@ export default function Home() {
           </div>
         </section>
       </main>
+
+      <OnboardingTour isOpen={showTour} onClose={() => setShowTour(false)} />
 
       {/* Footer */}
       <footer className="bg-secondary text-secondary-foreground mt-16">

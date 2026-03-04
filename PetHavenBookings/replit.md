@@ -8,6 +8,22 @@ The system includes an admin section with password-based authentication for mana
 
 ## Recent Changes
 
+**March 4, 2026 - Onboarding Tour:**
+- Added guided tutorial that appears automatically for first-time visitors
+- 4-step tour: Welcome, Calendar, Booking Form, Daily Bookings
+- localStorage persistence (key 'onboardingComplete') to show only once
+- "Guida" button in header to reopen tutorial anytime
+- Keyboard navigation support (Escape, Arrow keys, Enter)
+- Accessible with ARIA attributes, focus management, scroll tracking
+
+**March 4, 2026 - Admin Full Booking Visibility:**
+- Admin users now see all booking details (name, email, times) on the home calendar page
+- Server-side session check on /api/bookings/:date returns full data for admin sessions
+- DailyBookings component accepts isAdmin prop to show full details
+
+**March 4, 2026 - Capacity Increase:**
+- Increased daily capacity from 5 to 9 spots (morning and afternoon independently)
+
 **January 9, 2026 - Email-Based Privacy Feature:**
 - Added email field to booking form (required for all new bookings)
 - Implemented privacy system: users only see full details of their own bookings (matching email)
