@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 
 interface DailyBookingsProps {
   selectedDate: string;
+  isAdmin?: boolean;
 }
 
 interface BookingWithPrivacy {
@@ -23,7 +24,7 @@ interface BookingWithPrivacy {
   isOwn: boolean;
 }
 
-export default function DailyBookings({ selectedDate }: DailyBookingsProps) {
+export default function DailyBookings({ selectedDate, isAdmin = false }: DailyBookingsProps) {
   const [userEmail, setUserEmail] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('userEmail') || '';
@@ -132,15 +133,17 @@ export default function DailyBookings({ selectedDate }: DailyBookingsProps) {
           </div>
         ) : bookings && bookings.length > 0 ? (
           <div className="space-y-4">
-            {bookings.map((booking) => (
+            {bookings.map((booking) => {
+              const showDetails = booking.isOwn || isAdmin;
+              return (
               <div 
                 key={booking.id} 
                 className={`bg-card border rounded-lg p-4 transition-all duration-200 hover:shadow-md ${
-                  booking.isOwn ? 'border-primary/30 bg-primary/5' : 'border-border'
+                  booking.isOwn ? 'border-primary/30 bg-primary/5' : isAdmin ? 'border-indigo-300/30 bg-indigo-50/5' : 'border-border'
                 }`}
                 data-testid={`booking-card-${booking.id}`}
               >
-                {booking.isOwn ? (
+                {showDetails ? (
                   <>
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-3">
@@ -155,6 +158,11 @@ export default function DailyBookings({ selectedDate }: DailyBookingsProps) {
                             <User size={12} />
                             {booking.ownerName}
                           </p>
+                          {isAdmin && booking.email && (
+                            <p className="text-xs text-muted-foreground/70 mt-0.5" data-testid={`text-email-${booking.id}`}>
+                              {booking.email}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-1">
@@ -164,7 +172,7 @@ export default function DailyBookings({ selectedDate }: DailyBookingsProps) {
                         >
                           {getServiceIcon(booking.serviceType)} {getServiceLabel(booking.serviceType)}
                         </Badge>
-                        <span className="text-xs text-primary font-medium">La tua prenotazione</span>
+                        {booking.isOwn && <span className="text-xs text-primary font-medium">La tua prenotazione</span>}
                       </div>
                     </div>
                     <div className="space-y-2 text-sm">
@@ -222,7 +230,8 @@ export default function DailyBookings({ selectedDate }: DailyBookingsProps) {
                   </div>
                 )}
               </div>
-            ))}
+            );
+            })}
           </div>
         ) : (
           <div className="text-center py-12" data-testid="empty-bookings-state">

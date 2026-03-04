@@ -96,7 +96,7 @@ export default function Home() {
           <div className="lg:col-span-2 space-y-6">
             <Calendar selectedDate={selectedDate} onDateSelect={setSelectedDate} />
             <IdentifyEmailDialog />
-            <DailyBookings selectedDate={selectedDate} />
+            <DailyBookings selectedDate={selectedDate} isAdmin={adminStatus?.isAdmin || false} />
           </div>
 
           {/* Right Column: Booking Form */}

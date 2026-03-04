@@ -42,19 +42,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Normalize user email for comparison (lowercase, trimmed)
       const normalizedUserEmail = userEmail?.toLowerCase().trim();
+      const isAdmin = req.session?.isAdmin === true;
       
-      // Filter booking details based on email ownership
+      // Filter booking details based on email ownership or admin status
       const filteredBookings = bookings.map(booking => {
         const isOwner = normalizedUserEmail && booking.email.toLowerCase().trim() === normalizedUserEmail;
         
-        if (isOwner) {
-          // Return full details for own bookings
+        if (isOwner || isAdmin) {
           return {
             ...booking,
-            isOwn: true,
+            isOwn: isOwner ? true : false,
           };
         } else {
-          // Return anonymized info for others' bookings
           return {
             id: booking.id,
             serviceType: booking.serviceType,
@@ -63,7 +62,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             entryTime: booking.entryTime,
             exitTime: booking.exitTime,
             isOwn: false,
-            // Hide personal details
             dogName: null,
             ownerName: null,
             email: null,
