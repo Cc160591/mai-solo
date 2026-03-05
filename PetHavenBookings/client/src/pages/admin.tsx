@@ -103,6 +103,7 @@ export default function AdminDashboard() {
     defaultValues: {
       dogName: '',
       ownerName: '',
+      email: '',
       serviceType: 'asilo',
       startDate: '',
       endDate: '',
@@ -166,6 +167,7 @@ export default function AdminDashboard() {
     editForm.reset({
       dogName: booking.dogName,
       ownerName: booking.ownerName,
+      email: booking.email || '',
       serviceType: booking.serviceType as 'asilo' | 'pensione',
       startDate: booking.startDate,
       endDate: booking.endDate || booking.startDate,
@@ -385,6 +387,20 @@ export default function AdminDashboard() {
                         <FormLabel>Proprietario *</FormLabel>
                         <FormControl>
                           <Input {...field} data-testid="input-edit-owner-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={editForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email *</FormLabel>
+                        <FormControl>
+                          <Input type="email" {...field} data-testid="input-edit-email" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
