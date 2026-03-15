@@ -383,6 +383,13 @@ export default function AdminDashboard() {
     };
   }, [toast]);
 
+  useEffect(() => {
+    if (isRecurring && recurringDates.length > 0) {
+      newForm.setValue('startDate', recurringDates[0]);
+      newForm.setValue('endDate', recurringDates[0]);
+    }
+  }, [isRecurring, recurringDates, newForm]);
+
   if (isAdminStatusLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -429,13 +436,6 @@ export default function AdminDashboard() {
       });
     }
   };
-
-  useEffect(() => {
-    if (isRecurring && recurringDates.length > 0) {
-      newForm.setValue('startDate', recurringDates[0]);
-      newForm.setValue('endDate', recurringDates[0]);
-    }
-  }, [isRecurring, recurringDates, newForm]);
 
   const onSubmitNew = (data: InsertBooking) => {
     if (isRecurring) {
