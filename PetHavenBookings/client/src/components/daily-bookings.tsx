@@ -132,7 +132,7 @@ export default function DailyBookings({ selectedDate, isAdmin = false }: DailyBo
             ))}
           </div>
         ) : bookings && bookings.length > 0 ? (
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {bookings.map((booking) => {
               const showDetails = booking.isOwn || isAdmin;
               return (
