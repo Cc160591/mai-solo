@@ -27,6 +27,112 @@ import { cn } from "@/lib/utils";
 
 const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
 
+interface BookingSectionProps {
+  title: string;
+  description: string;
+  bookings: Booking[];
+  accentClass: string;
+  badgeClass: string;
+  onEdit: (booking: Booking) => void;
+  onDelete: (id: number, dogName: string) => void;
+  deleteIsPending: boolean;
+}
+
+function BookingSection({ title, description, bookings, accentClass, badgeClass, onEdit, onDelete, deleteIsPending }: BookingSectionProps) {
+  return (
+    <Card className={accentClass}>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-lg">{title}</CardTitle>
+            <CardDescription>{description}</CardDescription>
+          </div>
+          <span className={`text-sm font-semibold px-3 py-1 rounded-full ${badgeClass}`}>
+            {bookings.length} {bookings.length === 1 ? 'prenotazione' : 'prenotazioni'}
+          </span>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {bookings.length === 0 ? (
+          <p className="text-center text-sm text-gray-400 py-6">Nessuna prenotazione</p>
+        ) : (
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">ID</TableHead>
+                  <TableHead>Cane</TableHead>
+                  <TableHead>Proprietario</TableHead>
+                  <TableHead>Data Inizio</TableHead>
+                  <TableHead>Data Fine</TableHead>
+                  <TableHead>Entrata</TableHead>
+                  <TableHead>Uscita</TableHead>
+                  <TableHead className="text-right w-20">Azioni</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {bookings.map((booking) => (
+                  <TableRow key={booking.id} data-testid={`row-booking-${booking.id}`}>
+                    <TableCell className="font-medium text-gray-400">{booking.id}</TableCell>
+                    <TableCell className="font-medium" data-testid={`text-dog-${booking.id}`}>
+                      {booking.dogName}
+                    </TableCell>
+                    <TableCell data-testid={`text-owner-${booking.id}`}>
+                      {booking.ownerName}
+                    </TableCell>
+                    <TableCell data-testid={`text-start-date-${booking.id}`}>
+                      {format(new Date(booking.startDate), "dd MMM yyyy", { locale: it })}
+                    </TableCell>
+                    <TableCell data-testid={`text-end-date-${booking.id}`}>
+                      {booking.endDate && booking.endDate !== booking.startDate
+                        ? format(new Date(booking.endDate), "dd MMM yyyy", { locale: it })
+                        : <span className="text-gray-400">—</span>
+                      }
+                    </TableCell>
+                    <TableCell data-testid={`text-entry-${booking.id}`}>
+                      <span className="font-medium">{booking.entryTime}</span>
+                      {booking.exactEntryTime && (
+                        <span className="text-xs text-gray-400 block">({booking.exactEntryTime})</span>
+                      )}
+                    </TableCell>
+                    <TableCell data-testid={`text-exit-${booking.id}`}>
+                      <span className="font-medium">{booking.exitTime}</span>
+                      {booking.exactExitTime && (
+                        <span className="text-xs text-gray-400 block">({booking.exactExitTime})</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex gap-1 justify-end">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onEdit(booking)}
+                          data-testid={`button-edit-${booking.id}`}
+                        >
+                          <Edit className="h-4 w-4 text-primary" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onDelete(booking.id, booking.dogName)}
+                          disabled={deleteIsPending}
+                          data-testid={`button-delete-${booking.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function generateRecurringDates(startFromDate: string, selectedDays: number[], numWeeks: number): string[] {
   const dates: string[] = [];
   const start = new Date(startFromDate);
@@ -421,119 +527,54 @@ export default function AdminDashboard() {
           </TabsList>
 
           <TabsContent value="bookings" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Tutte le Prenotazioni</CardTitle>
-                    <CardDescription>
-                      Gestisci e visualizza tutte le prenotazioni
-                    </CardDescription>
-                  </div>
-                  <Button
-                    onClick={() => { resetNewForm(); setShowNewDialog(true); }}
-                    data-testid="button-new-booking"
-                  >
-                    <PlusCircle className="h-4 w-4 mr-2" />
-                    Nuova Prenotazione
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-            {isLoading ? (
-              <div className="text-center py-8">Caricamento...</div>
-            ) : sortedBookings.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                Nessuna prenotazione trovata
+            {/* Top bar */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  Gestione Prenotazioni
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {sortedBookings.length} prenotazioni totali
+                </p>
               </div>
+              <Button
+                onClick={() => { resetNewForm(); setShowNewDialog(true); }}
+                data-testid="button-new-booking"
+              >
+                <PlusCircle className="h-4 w-4 mr-2" />
+                Nuova Prenotazione
+              </Button>
+            </div>
+
+            {isLoading ? (
+              <div className="text-center py-12">Caricamento...</div>
             ) : (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>ID</TableHead>
-                      <TableHead>Cane</TableHead>
-                      <TableHead>Proprietario</TableHead>
-                      <TableHead>Servizio</TableHead>
-                      <TableHead>Data Inizio</TableHead>
-                      <TableHead>Data Fine</TableHead>
-                      <TableHead>Entrata</TableHead>
-                      <TableHead>Uscita</TableHead>
-                      <TableHead className="text-right">Azioni</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedBookings.map((booking) => (
-                      <TableRow key={booking.id} data-testid={`row-booking-${booking.id}`}>
-                        <TableCell className="font-medium">{booking.id}</TableCell>
-                        <TableCell data-testid={`text-dog-${booking.id}`}>
-                          {booking.dogName}
-                        </TableCell>
-                        <TableCell data-testid={`text-owner-${booking.id}`}>
-                          {booking.ownerName}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={booking.serviceType === 'pensione' ? 'default' : 'secondary'}
-                            data-testid={`badge-service-${booking.id}`}
-                          >
-                            {booking.serviceType === 'pensione' ? 'Pensione' : 'Asilo'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell data-testid={`text-start-date-${booking.id}`}>
-                          {format(new Date(booking.startDate), "dd MMM yyyy", { locale: it })}
-                        </TableCell>
-                        <TableCell data-testid={`text-end-date-${booking.id}`}>
-                          {booking.endDate
-                            ? format(new Date(booking.endDate), "dd MMM yyyy", { locale: it })
-                            : '-'
-                          }
-                        </TableCell>
-                        <TableCell data-testid={`text-entry-${booking.id}`}>
-                          {booking.entryTime}
-                          {booking.exactEntryTime && (
-                            <span className="text-xs text-gray-500 block">
-                              ({booking.exactEntryTime})
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell data-testid={`text-exit-${booking.id}`}>
-                          {booking.exitTime}
-                          {booking.exactExitTime && (
-                            <span className="text-xs text-gray-500 block">
-                              ({booking.exactExitTime})
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex gap-2 justify-end">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEdit(booking)}
-                              data-testid={`button-edit-${booking.id}`}
-                            >
-                              <Edit className="h-4 w-4 text-primary" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(booking.id, booking.dogName)}
-                              disabled={deleteBookingMutation.isPending}
-                              data-testid={`button-delete-${booking.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-600" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <div className="space-y-6">
+                {/* Pensione Section */}
+                <BookingSection
+                  title="🌙 Pensione"
+                  description="Soggiorni notturni e multi-giorno"
+                  bookings={sortedBookings.filter(b => b.serviceType === 'pensione')}
+                  accentClass="border-l-4 border-l-indigo-500"
+                  badgeClass="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200"
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  deleteIsPending={deleteBookingMutation.isPending}
+                />
+
+                {/* Asilo Section */}
+                <BookingSection
+                  title="☀️ Asilo"
+                  description="Servizio giornaliero lunedì-venerdì"
+                  bookings={sortedBookings.filter(b => b.serviceType === 'asilo')}
+                  accentClass="border-l-4 border-l-amber-500"
+                  badgeClass="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  deleteIsPending={deleteBookingMutation.isPending}
+                />
               </div>
             )}
-              </CardContent>
-            </Card>
           </TabsContent>
 
           <TabsContent value="closures" className="space-y-4">
