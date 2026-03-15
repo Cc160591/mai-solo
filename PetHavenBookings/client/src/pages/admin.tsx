@@ -557,31 +557,36 @@ export default function AdminDashboard() {
             {isLoading ? (
               <div className="text-center py-12">Caricamento...</div>
             ) : (
-              <div className="space-y-6">
-                {/* Pensione Section */}
-                <BookingSection
-                  title="🌙 Pensione"
-                  description="Soggiorni notturni e multi-giorno"
-                  bookings={sortedBookings.filter(b => b.serviceType === 'pensione')}
-                  accentClass="border-l-4 border-l-indigo-500"
-                  badgeClass="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200"
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  deleteIsPending={deleteBookingMutation.isPending}
-                />
-
-                {/* Asilo Section */}
-                <BookingSection
-                  title="☀️ Asilo"
-                  description="Servizio giornaliero lunedì-venerdì"
-                  bookings={sortedBookings.filter(b => b.serviceType === 'asilo')}
-                  accentClass="border-l-4 border-l-amber-500"
-                  badgeClass="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  deleteIsPending={deleteBookingMutation.isPending}
-                />
-              </div>
+              <Tabs defaultValue="pensione">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="pensione">🌙 Pensione</TabsTrigger>
+                  <TabsTrigger value="asilo">☀️ Asilo</TabsTrigger>
+                </TabsList>
+                <TabsContent value="pensione">
+                  <BookingSection
+                    title="🌙 Pensione"
+                    description="Soggiorni notturni e multi-giorno"
+                    bookings={sortedBookings.filter(b => b.serviceType === 'pensione')}
+                    accentClass="border-l-4 border-l-indigo-500"
+                    badgeClass="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200"
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    deleteIsPending={deleteBookingMutation.isPending}
+                  />
+                </TabsContent>
+                <TabsContent value="asilo">
+                  <BookingSection
+                    title="☀️ Asilo"
+                    description="Servizio giornaliero lunedì-venerdì"
+                    bookings={sortedBookings.filter(b => b.serviceType === 'asilo')}
+                    accentClass="border-l-4 border-l-amber-500"
+                    badgeClass="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    deleteIsPending={deleteBookingMutation.isPending}
+                  />
+                </TabsContent>
+              </Tabs>
             )}
           </TabsContent>
 
