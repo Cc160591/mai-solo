@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { insertBookingSchema, type InsertBooking, insertClosureSchema, insertClosureRangeSchema } from "@shared/schema";
+import { insertBookingSchema, batchBookingSchema, type InsertBooking, insertClosureSchema, insertClosureRangeSchema } from "@shared/schema";
 import { requireAdmin, checkAdminPassword } from "./auth";
 import { z } from "zod";
 import { sendBookingNotification } from "./email";
@@ -245,6 +245,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create multiple bookings at once (batch / recurring)
+  app.post("/api/bookings/batch", async (req, res) => {
+    try {
+      const validationResult = batchBookingSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({
+          message: "Dati prenotazione non validi",
+          errors: validationResult.error.issues,
+        });
+      }
+
+      const { dates, ...bookingBase } = validationResult.data;
+
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const minDate = tomorrow.toISOString().split('T')[0];
+
+      const created: any[] = [];
+      const skipped: { date: string; reason: string }[] = [];
+
+      for (const date of dates) {
+        if (date < minDate) {
+          skipped.push({ date, reason: "La data deve essere da domani in poi" });
+          continue;
+        }
+
+        if (bookingBase.serviceType === 'asilo') {
+          const dayOfWeek = new Date(date).getDay();
+          if (dayOfWeek === 0 || dayOfWeek === 6) {
+            skipped.push({ date, reason: "L'asilo è disponibile solo dal lunedì al venerdì" });
+            continue;
+          }
+        }
+
+        const closuresForDate = await storage.getClosuresInDateRange(date, date);
+        const closureCheck = checkClosureConflicts(
+          date, date,
+          bookingBase.serviceType as 'asilo' | 'pensione',
+          closuresForDate
+        );
+        if (closureCheck.hasConflict) {
+          skipped.push({ date, reason: "Giorno di chiusura" });
+          continue;
+        }
+
+        const { morning, afternoon } = await storage.getAvailability(date);
+        if (bookingBase.serviceType === 'pensione') {
+          if (morning < 1 || afternoon < 1) {
+            skipped.push({ date, reason: "Nessun posto disponibile" });
+            continue;
+          }
+        } else {
+          if ((bookingBase.entryTime === '7:30' || bookingBase.entryTime === '8:00-9:00') && morning < 1) {
+            skipped.push({ date, reason: "Nessun posto disponibile per la mattina" });
+            continue;
+          } else if (bookingBase.entryTime === '13:30-14:00' && afternoon < 1) {
+            skipped.push({ date, reason: "Nessun posto disponibile per il pomeriggio" });
+            continue;
+          }
+        }
+
+        const bookingData: InsertBooking = {
+          ...bookingBase,
+          startDate: date,
+          endDate: date,
+        };
+
+        const booking = await storage.createBooking(bookingData);
+        created.push(booking);
+
+        if ((app as any).notifyAdmins) {
+          (app as any).notifyAdmins(booking);
+        }
+
+        sendBookingNotification({
+          dogName: booking.dogName,
+          ownerName: booking.ownerName,
+          serviceType: booking.serviceType as 'asilo' | 'pensione',
+          startDate: booking.startDate,
+          endDate: booking.endDate,
+          entryTime: booking.entryTime,
+          exitTime: booking.exitTime,
+          exactEntryTime: booking.exactEntryTime,
+          exactExitTime: booking.exactExitTime,
+        }).catch(err => console.error('Email notification error:', err));
+      }
+
+      if (created.length === 0) {
+        return res.status(409).json({
+          message: "Nessuna prenotazione creata. Tutte le date selezionate non sono disponibili.",
+          created: [],
+          skipped,
+        });
+      }
+
+      res.status(201).json({
+        message: `${created.length} prenotazioni create con successo${skipped.length > 0 ? `, ${skipped.length} saltate` : ''}`,
+        created,
+        skipped,
+      });
+    } catch (error) {
+      console.error("Error creating batch bookings:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Admin login
   app.post("/api/admin/login", async (req, res) => {
     try {
@@ -320,11 +427,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const partialBookingSchema = z.object({
         dogName: z.string().min(1).optional(),
         ownerName: z.string().min(1).optional(),
+        email: z.string().email().optional(),
         serviceType: z.enum(['asilo', 'pensione']).optional(),
         startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         entryTime: z.enum(['7:30', '8:00-9:00', '13:30-14:00']).optional(),
-        exitTime: z.enum(['11:30-12:00', '17:00-18:00']).optional(),
+        exitTime: z.enum(['8:00-9:00', '11:30-12:00', '17:00-18:00']).optional(),
         exactEntryTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
         exactExitTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
       });

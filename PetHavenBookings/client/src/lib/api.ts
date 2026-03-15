@@ -1,5 +1,11 @@
 import { apiRequest } from "./queryClient";
-import type { InsertBooking, Booking, AvailabilityData, CalendarData } from "@shared/schema";
+import type { InsertBooking, Booking, BatchBooking, AvailabilityData, CalendarData } from "@shared/schema";
+
+export type BatchBookingResult = {
+  message: string;
+  created: Booking[];
+  skipped: { date: string; reason: string }[];
+};
 
 export const api = {
   async getAvailability(date: string): Promise<AvailabilityData> {
@@ -20,5 +26,10 @@ export const api = {
   async createBooking(booking: InsertBooking): Promise<Booking> {
     const response = await apiRequest("POST", "/api/bookings", booking);
     return response.json();
-  }
+  },
+
+  async createBatchBookings(batch: BatchBooking): Promise<BatchBookingResult> {
+    const response = await apiRequest("POST", "/api/bookings/batch", batch);
+    return response.json();
+  },
 };

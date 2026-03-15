@@ -62,6 +62,24 @@ export const insertBookingSchema = createInsertSchema(bookings).omit({
   }
 );
 
+export const batchBookingSchema = z.object({
+  dogName: z.string().min(1, "Il nome del cane è obbligatorio"),
+  ownerName: z.string().min(1, "Il nome del proprietario è obbligatorio"),
+  email: z.string().email("Inserisci un indirizzo email valido").min(1, "L'email è obbligatoria"),
+  serviceType: z.enum(['asilo', 'pensione']),
+  entryTime: z.enum(['7:30', '8:00-9:00', '13:30-14:00']),
+  exitTime: z.enum(['8:00-9:00', '11:30-12:00', '17:00-18:00']),
+  exactEntryTime: z.string()
+    .regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Inserisci un orario valido (es. 8:30)")
+    .min(1, "L'orario esatto di arrivo è obbligatorio"),
+  exactExitTime: z.string()
+    .regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Inserisci un orario valido (es. 17:30)")
+    .min(1, "L'orario esatto di ritiro è obbligatorio"),
+  dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).min(1, "Seleziona almeno una data").max(50),
+});
+
+export type BatchBooking = z.infer<typeof batchBookingSchema>;
+
 export type InsertBooking = z.infer<typeof insertBookingSchema>;
 export type Booking = typeof bookings.$inferSelect;
 

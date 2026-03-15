@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { api } from "@/lib/api";
+import { api, type BatchBookingResult } from "@/lib/api";
 import { insertBookingSchema, type InsertBooking } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { PlusCircle, Dog, User, Calendar, Clock, Info, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import { PlusCircle, Dog, User, Calendar, Clock, Info, CheckCircle, XCircle, AlertTriangle, Repeat, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { checkClosureConflicts, formatShortDate } from "@shared/utils";
 
@@ -25,13 +25,38 @@ const timeSlots = {
   exit: ['8:00-9:00', '11:30-12:00', '17:00-18:00'] as const,
 };
 
+const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+const DAY_NAMES_FULL = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
+
+function generateRecurringDates(startFromDate: string, selectedDays: number[], numWeeks: number): string[] {
+  const dates: string[] = [];
+  const start = new Date(startFromDate);
+  start.setDate(start.getDate() - start.getDay());
+
+  for (let week = 0; week < numWeeks; week++) {
+    for (const day of selectedDays) {
+      const d = new Date(start);
+      d.setDate(d.getDate() + week * 7 + day);
+      const dateStr = d.toISOString().split('T')[0];
+      if (dateStr >= startFromDate) {
+        dates.push(dateStr);
+      }
+    }
+  }
+
+  return dates.sort();
+}
+
 export default function BookingForm({ selectedDate }: BookingFormProps) {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmedBooking, setConfirmedBooking] = useState<any>(null);
+  const [batchResult, setBatchResult] = useState<BatchBookingResult | null>(null);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const [numWeeks, setNumWeeks] = useState(4);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Get saved email from localStorage
   const getSavedEmail = () => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('userEmail') || '';
@@ -55,29 +80,38 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
     },
   });
 
-  // Watch form values
   const formStartDate = form.watch('startDate');
   const formEndDate = form.watch('endDate');
   const formServiceType = form.watch('serviceType');
   const formEntryTime = form.watch('entryTime');
   const formExitTime = form.watch('exitTime');
 
-  // Fetch closures for the date range
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const minDate = tomorrow.toISOString().split('T')[0];
+
+  const recurringDates = useMemo(() => {
+    if (!isRecurring || selectedDays.length === 0) return [];
+    return generateRecurringDates(minDate, selectedDays, numWeeks);
+  }, [isRecurring, selectedDays, numWeeks, minDate]);
+
+  const effectiveStartDate = isRecurring && recurringDates.length > 0 ? recurringDates[0] : formStartDate;
+  const effectiveEndDate = isRecurring && recurringDates.length > 0 ? recurringDates[recurringDates.length - 1] : formEndDate;
+
   const { data: closures } = useQuery<any[]>({
-    queryKey: ["/api/closures/range", formStartDate, formEndDate],
+    queryKey: ["/api/closures/range", effectiveStartDate, effectiveEndDate],
     queryFn: async () => {
-      if (!formStartDate || !formEndDate) return [];
-      const response = await fetch(`/api/closures/range/${formStartDate}/${formEndDate}`, {
+      if (!effectiveStartDate || !effectiveEndDate) return [];
+      const response = await fetch(`/api/closures/range/${effectiveStartDate}/${effectiveEndDate}`, {
         credentials: "include",
       });
       if (!response.ok) throw new Error('Failed to fetch closures');
       return response.json();
     },
-    enabled: !!(formStartDate && formEndDate),
+    enabled: !!(effectiveStartDate && effectiveEndDate),
   });
 
-  // Check for closure conflicts in the booking range
-  const closureConflict = formStartDate && formEndDate && closures ? 
+  const closureConflict = !isRecurring && formStartDate && formEndDate && closures ?
     checkClosureConflicts(
       formStartDate,
       formEndDate,
@@ -85,18 +119,14 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
       closures
     ) : { hasConflict: false, conflictDates: [] };
 
-  // Update startDate when selectedDate changes
   useEffect(() => {
     form.setValue('startDate', selectedDate);
     form.setValue('endDate', selectedDate);
   }, [selectedDate, form]);
 
-  // Auto-update endDate when startDate changes
   useEffect(() => {
     const startDate = form.watch('startDate');
     const endDate = form.watch('endDate');
-    
-    // If endDate is empty or before startDate, set it to startDate
     if (!endDate || endDate < startDate) {
       form.setValue('endDate', startDate);
     }
@@ -105,11 +135,11 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
   const createBookingMutation = useMutation({
     mutationFn: api.createBooking,
     onSuccess: (booking) => {
-      // Save email to localStorage for privacy-based booking identification
       if (booking.email) {
         localStorage.setItem('userEmail', booking.email);
       }
       setConfirmedBooking(booking);
+      setBatchResult(null);
       setShowConfirmation(true);
       queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
       queryClient.invalidateQueries({ queryKey: ['/api/bookings'], refetchType: 'all' });
@@ -128,10 +158,39 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
     },
   });
 
+  const createBatchMutation = useMutation({
+    mutationFn: api.createBatchBookings,
+    onSuccess: (result) => {
+      if (result.created.length > 0 && result.created[0].email) {
+        localStorage.setItem('userEmail', result.created[0].email);
+      }
+      setConfirmedBooking(null);
+      setBatchResult(result);
+      setShowConfirmation(true);
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/bookings'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['/api/availability'], refetchType: 'all' });
+      toast({
+        title: "Prenotazioni ricorrenti create!",
+        description: result.message,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Errore",
+        description: error.message || "Si è verificato un errore durante la prenotazione.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCloseConfirmation = () => {
     setShowConfirmation(false);
     setConfirmedBooking(null);
-    // Reset form after closing modal (keep the email)
+    setBatchResult(null);
+    setIsRecurring(false);
+    setSelectedDays([]);
+    setNumWeeks(4);
     form.reset({
       dogName: '',
       ownerName: '',
@@ -146,22 +205,57 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
     });
   };
 
+  useEffect(() => {
+    if (isRecurring && recurringDates.length > 0) {
+      form.setValue('startDate', recurringDates[0]);
+      form.setValue('endDate', recurringDates[0]);
+    }
+  }, [isRecurring, recurringDates, form]);
+
   const onSubmit = (data: InsertBooking) => {
-    // Validation is done via closureConflict check and disabled submit button
-    // Backend will also validate and reject if there are conflicts
-    createBookingMutation.mutate(data);
+    if (isRecurring) {
+      if (recurringDates.length === 0) {
+        toast({
+          title: "Errore",
+          description: "Seleziona almeno un giorno della settimana per la prenotazione ricorrente.",
+          variant: "destructive",
+        });
+        return;
+      }
+      createBatchMutation.mutate({
+        dogName: data.dogName,
+        ownerName: data.ownerName,
+        email: data.email,
+        serviceType: data.serviceType as 'asilo' | 'pensione',
+        entryTime: data.entryTime as any,
+        exitTime: data.exitTime as any,
+        exactEntryTime: data.exactEntryTime,
+        exactExitTime: data.exactExitTime,
+        dates: recurringDates,
+      });
+    } else {
+      createBookingMutation.mutate(data);
+    }
   };
 
-  const TimeSlotButton = ({ 
-    value, 
-    selected, 
-    onClick, 
+  const toggleDay = (day: number) => {
+    setSelectedDays(prev =>
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort()
+    );
+  };
+
+  const isPending = createBookingMutation.isPending || createBatchMutation.isPending;
+
+  const TimeSlotButton = ({
+    value,
+    selected,
+    onClick,
     children,
-    testId 
-  }: { 
-    value: string; 
-    selected: boolean; 
-    onClick: () => void; 
+    testId
+  }: {
+    value: string;
+    selected: boolean;
+    onClick: () => void;
     children: React.ReactNode;
     testId: string;
   }) => (
@@ -181,17 +275,21 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('it-IT', { 
-      day: 'numeric', 
-      month: 'long', 
-      year: 'numeric' 
+    return date.toLocaleDateString('it-IT', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
     });
   };
 
-  // Get tomorrow's date for min attribute
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const minDate = tomorrow.toISOString().split('T')[0];
+  const formatDateShort = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('it-IT', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    });
+  };
 
   return (
     <>
@@ -203,10 +301,9 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
           </h3>
           <p className="text-sm text-muted-foreground mt-1">Compila il modulo per prenotare</p>
         </div>
-        
+
         <CardContent className="p-6">
-          {/* Closure Conflict Warning */}
-          {closureConflict.hasConflict && (
+          {!isRecurring && closureConflict.hasConflict && (
             <Alert variant="destructive" className="mb-4" data-testid="alert-closure-conflict">
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Impossibile prenotare</AlertTitle>
@@ -224,8 +321,7 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-              
-              {/* Dog Name */}
+
               <FormField
                 control={form.control}
                 name="dogName"
@@ -236,8 +332,8 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                       Nome del Cane <span className="text-destructive">*</span>
                     </FormLabel>
                     <FormControl>
-                      <Input 
-                        {...field} 
+                      <Input
+                        {...field}
                         placeholder="Es. Max"
                         data-testid="input-dog-name"
                       />
@@ -247,7 +343,6 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                 )}
               />
 
-              {/* Owner Name */}
               <FormField
                 control={form.control}
                 name="ownerName"
@@ -258,8 +353,8 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                       Nome del Proprietario <span className="text-destructive">*</span>
                     </FormLabel>
                     <FormControl>
-                      <Input 
-                        {...field} 
+                      <Input
+                        {...field}
                         placeholder="Es. Mario Rossi"
                         data-testid="input-owner-name"
                       />
@@ -269,7 +364,6 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                 )}
               />
 
-              {/* Email */}
               <FormField
                 control={form.control}
                 name="email"
@@ -279,8 +373,8 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                       📧 Email <span className="text-destructive">*</span>
                     </FormLabel>
                     <FormControl>
-                      <Input 
-                        {...field} 
+                      <Input
+                        {...field}
                         type="email"
                         placeholder="Es. mario.rossi@email.com"
                         data-testid="input-email"
@@ -294,7 +388,6 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                 )}
               />
 
-              {/* Service Type */}
               <FormField
                 control={form.control}
                 name="serviceType"
@@ -302,14 +395,19 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                   <FormItem>
                     <FormLabel>Tipo di Servizio <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
-                      <RadioGroup 
-                        onValueChange={field.onChange} 
+                      <RadioGroup
+                        onValueChange={(val) => {
+                          field.onChange(val);
+                          if (isRecurring && val === 'asilo') {
+                            setSelectedDays(prev => prev.filter(d => d >= 1 && d <= 5));
+                          }
+                        }}
                         value={field.value}
                         className="space-y-3"
                       >
                         <div className="flex items-center space-x-2 p-3 border-2 border-border rounded-lg hover:border-primary transition-all">
-                          <RadioGroupItem 
-                            value="asilo" 
+                          <RadioGroupItem
+                            value="asilo"
                             id="asilo"
                             data-testid="radio-asilo"
                           />
@@ -321,10 +419,10 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                             <p className="text-xs text-muted-foreground mt-1">Servizio giornaliero (Lun-Ven)</p>
                           </label>
                         </div>
-                        
+
                         <div className="flex items-center space-x-2 p-3 border-2 border-border rounded-lg hover:border-primary transition-all">
-                          <RadioGroupItem 
-                            value="pensione" 
+                          <RadioGroupItem
+                            value="pensione"
                             id="pensione"
                             data-testid="radio-pensione"
                           />
@@ -343,57 +441,172 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                 )}
               />
 
-              {/* Start Date */}
-              <FormField
-                control={form.control}
-                name="startDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <Calendar size={16} />
-                      Data Inizio <span className="text-destructive">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="date" 
-                        min={minDate}
-                        {...field}
-                        data-testid="input-start-date"
-                      />
-                    </FormControl>
-                    <p className="text-xs text-muted-foreground">Le prenotazioni sono disponibili da domani</p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="border-2 border-border rounded-lg p-4 space-y-4">
+                <div
+                  className="flex items-center justify-between cursor-pointer"
+                  onClick={() => setIsRecurring(!isRecurring)}
+                >
+                  <div className="flex items-center gap-2">
+                    <Repeat size={16} className={cn("transition-colors", isRecurring ? "text-primary" : "text-muted-foreground")} />
+                    <span className="font-medium">Prenotazione Ricorrente</span>
+                  </div>
+                  <button
+                    type="button"
+                    className={cn(
+                      "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                      isRecurring ? "bg-primary" : "bg-muted"
+                    )}
+                    onClick={(e) => { e.stopPropagation(); setIsRecurring(!isRecurring); }}
+                  >
+                    <span className={cn(
+                      "inline-block h-4 w-4 rounded-full bg-white transition-transform",
+                      isRecurring ? "translate-x-6" : "translate-x-1"
+                    )} />
+                  </button>
+                </div>
 
-              {/* End Date (required) */}
-              <FormField
-                control={form.control}
-                name="endDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      <Calendar size={16} />
-                      Data Fine <span className="text-destructive">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="date" 
-                        min={form.watch('startDate') || minDate}
-                        {...field}
-                        data-testid="input-end-date"
-                      />
-                    </FormControl>
+                {isRecurring && (
+                  <div className="space-y-4 pt-2 border-t border-border">
                     <p className="text-xs text-muted-foreground">
-                      Può essere uguale alla data di inizio per prenotazioni di un solo giorno
+                      Seleziona i giorni della settimana e per quante settimane ripetere la prenotazione.
                     </p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
-              {/* Entry Time */}
+                    <div>
+                      <p className="text-sm font-medium mb-2">Giorni della settimana</p>
+                      <div className="flex flex-wrap gap-2">
+                        {DAY_NAMES.map((name, index) => {
+                          const isWeekend = index === 0 || index === 6;
+                          const isDisabled = formServiceType === 'asilo' && isWeekend;
+                          return (
+                            <button
+                              key={index}
+                              type="button"
+                              disabled={isDisabled}
+                              onClick={() => toggleDay(index)}
+                              className={cn(
+                                "px-3 py-1.5 rounded-lg text-sm font-medium border-2 transition-all",
+                                selectedDays.includes(index)
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "border-border bg-card hover:border-primary/50",
+                                isDisabled && "opacity-40 cursor-not-allowed hover:border-border"
+                              )}
+                            >
+                              {name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {formServiceType === 'asilo' && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          L'asilo è disponibile solo dal lunedì al venerdì
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-medium mb-2">Numero di settimane</p>
+                      <div className="flex gap-2">
+                        {[2, 3, 4, 5, 6, 8].map((w) => (
+                          <button
+                            key={w}
+                            type="button"
+                            onClick={() => setNumWeeks(w)}
+                            className={cn(
+                              "px-3 py-1.5 rounded-lg text-sm font-medium border-2 transition-all",
+                              numWeeks === w
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "border-border bg-card hover:border-primary/50"
+                            )}
+                          >
+                            {w}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {recurringDates.length > 0 && (
+                      <div className="bg-primary/5 rounded-lg p-3">
+                        <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                          <Calendar size={14} />
+                          {recurringDates.length} date selezionate:
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                          {recurringDates.map((date) => (
+                            <span
+                              key={date}
+                              className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-md"
+                            >
+                              {formatDateShort(date)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {isRecurring && selectedDays.length === 0 && (
+                      <Alert>
+                        <Info className="h-4 w-4" />
+                        <AlertDescription className="text-xs">
+                          Seleziona almeno un giorno della settimana per vedere l'anteprima delle date.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {!isRecurring && (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="startDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-2">
+                          <Calendar size={16} />
+                          Data Inizio <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="date"
+                            min={minDate}
+                            {...field}
+                            data-testid="input-start-date"
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">Le prenotazioni sono disponibili da domani</p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="endDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-2">
+                          <Calendar size={16} />
+                          Data Fine <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="date"
+                            min={form.watch('startDate') || minDate}
+                            {...field}
+                            data-testid="input-end-date"
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">
+                          Può essere uguale alla data di inizio per prenotazioni di un solo giorno
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
+
               <FormField
                 control={form.control}
                 name="entryTime"
@@ -418,7 +631,6 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                 )}
               />
 
-              {/* Exact Entry Time */}
               <FormField
                 control={form.control}
                 name="exactEntryTime"
@@ -429,8 +641,8 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                       Orario Esatto di Arrivo <span className="text-destructive">*</span>
                     </FormLabel>
                     <FormControl>
-                      <Input 
-                        type="time" 
+                      <Input
+                        type="time"
                         {...field}
                         placeholder="Es. 8:10"
                         data-testid="input-exact-entry-time"
@@ -444,7 +656,6 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                 )}
               />
 
-              {/* Exit Time */}
               <FormField
                 control={form.control}
                 name="exitTime"
@@ -469,7 +680,6 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                 )}
               />
 
-              {/* Exact Exit Time */}
               <FormField
                 control={form.control}
                 name="exactExitTime"
@@ -480,8 +690,8 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                       Orario Esatto di Ritiro <span className="text-destructive">*</span>
                     </FormLabel>
                     <FormControl>
-                      <Input 
-                        type="time" 
+                      <Input
+                        type="time"
                         {...field}
                         placeholder="Es. 11:45"
                         data-testid="input-exact-exit-time"
@@ -495,18 +705,21 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                 )}
               />
 
-              {/* Submit Button */}
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={createBookingMutation.isPending || closureConflict.hasConflict}
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isPending || (!isRecurring && closureConflict.hasConflict) || (isRecurring && recurringDates.length === 0)}
                 data-testid="button-submit-booking"
               >
                 <CheckCircle size={16} className="mr-2" />
-                {createBookingMutation.isPending ? "Prenotando..." : "Conferma Prenotazione"}
+                {isPending
+                  ? "Prenotando..."
+                  : isRecurring
+                    ? `Conferma ${recurringDates.length} Prenotazioni`
+                    : "Conferma Prenotazione"
+                }
               </Button>
 
-              {/* Info Alert */}
               <div className="bg-accent/10 border border-accent/20 rounded-lg p-4 flex gap-3">
                 <Info className="text-accent mt-0.5" size={16} />
                 <div className="text-sm text-accent-foreground">
@@ -523,17 +736,54 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
         </CardContent>
       </Card>
 
-      {/* Confirmation Modal */}
       <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
         <DialogContent className="max-w-lg" data-testid="dialog-confirmation">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CheckCircle className="text-primary" size={24} />
-              Prenotazione Confermata
+              {batchResult ? "Prenotazioni Ricorrenti Confermate" : "Prenotazione Confermata"}
             </DialogTitle>
           </DialogHeader>
-          
-          {confirmedBooking && (
+
+          {batchResult ? (
+            <div className="space-y-4">
+              <div className="bg-primary/5 rounded-lg p-6">
+                <p className="font-semibold text-lg mb-3">
+                  {batchResult.created.length} prenotazioni create
+                </p>
+                <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto mb-3">
+                  {batchResult.created.map((b) => (
+                    <span key={b.id} className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-md">
+                      {formatDateShort(b.startDate)}
+                    </span>
+                  ))}
+                </div>
+                {batchResult.skipped.length > 0 && (
+                  <div className="border-t border-border pt-3 mt-3">
+                    <p className="text-sm font-medium text-orange-600 mb-2">
+                      {batchResult.skipped.length} date saltate:
+                    </p>
+                    <div className="space-y-1">
+                      {batchResult.skipped.map((s, i) => (
+                        <div key={i} className="text-xs text-muted-foreground flex items-center gap-2">
+                          <XCircle size={12} className="text-orange-500" />
+                          {formatDateShort(s.date)} - {s.reason}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <Button
+                onClick={handleCloseConfirmation}
+                className="w-full"
+                data-testid="button-close-confirmation"
+              >
+                Chiudi
+              </Button>
+            </div>
+          ) : confirmedBooking ? (
             <div className="space-y-4">
               <div className="bg-primary/5 rounded-lg p-6">
                 <div className="flex items-start gap-4 mb-4">
@@ -549,7 +799,7 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between items-center py-2 border-t border-border">
                     <span className="text-muted-foreground">Servizio:</span>
@@ -560,7 +810,7 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                   <div className="flex justify-between items-center py-2 border-t border-border">
                     <span className="text-muted-foreground">Data:</span>
                     <span className="font-medium">
-                      {confirmedBooking.endDate 
+                      {confirmedBooking.endDate
                         ? `${formatDate(confirmedBooking.startDate)} - ${formatDate(confirmedBooking.endDate)}`
                         : formatDate(confirmedBooking.startDate)
                       }
@@ -601,7 +851,7 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                 </div>
               </div>
 
-              <Button 
+              <Button
                 onClick={handleCloseConfirmation}
                 className="w-full"
                 data-testid="button-close-confirmation"
@@ -609,7 +859,7 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                 Chiudi
               </Button>
             </div>
-          )}
+          ) : null}
         </DialogContent>
       </Dialog>
     </>

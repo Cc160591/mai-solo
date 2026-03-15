@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { api, type BatchBookingResult } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,18 +10,41 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
-import { LogOut, Trash2, Calendar, Bell, Edit } from "lucide-react";
+import { LogOut, Trash2, Calendar, Bell, Edit, PlusCircle, Repeat, Info, XCircle } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertBookingSchema, type Booking, type InsertBooking } from "@shared/schema";
 import { ClosuresManagement } from "@/components/closures-management";
+import { cn } from "@/lib/utils";
+
+const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+
+function generateRecurringDates(startFromDate: string, selectedDays: number[], numWeeks: number): string[] {
+  const dates: string[] = [];
+  const start = new Date(startFromDate);
+  start.setDate(start.getDate() - start.getDay());
+
+  for (let week = 0; week < numWeeks; week++) {
+    for (const day of selectedDays) {
+      const d = new Date(start);
+      d.setDate(d.getDate() + week * 7 + day);
+      const dateStr = d.toISOString().split('T')[0];
+      if (dateStr >= startFromDate) {
+        dates.push(dateStr);
+      }
+    }
+  }
+
+  return dates.sort();
+}
 
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
@@ -28,8 +52,14 @@ export default function AdminDashboard() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showNewDialog, setShowNewDialog] = useState(false);
   const [showNotificationDialog, setShowNotificationDialog] = useState(false);
   const [newBookingData, setNewBookingData] = useState<any>(null);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const [numWeeks, setNumWeeks] = useState(4);
+  const [batchResult, setBatchResult] = useState<BatchBookingResult | null>(null);
+  const [showBatchResultDialog, setShowBatchResultDialog] = useState(false);
 
   const { data: adminStatus } = useQuery<{ isAdmin: boolean }>({
     queryKey: ["/api/admin/status"],
@@ -98,6 +128,52 @@ export default function AdminDashboard() {
     },
   });
 
+  const createBookingMutation = useMutation({
+    mutationFn: api.createBooking,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      setShowNewDialog(false);
+      resetNewForm();
+      toast({
+        title: "Prenotazione creata",
+        description: "La prenotazione è stata creata con successo",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile creare la prenotazione",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createBatchMutation = useMutation({
+    mutationFn: api.createBatchBookings,
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/calendar"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      setShowNewDialog(false);
+      resetNewForm();
+      setBatchResult(result);
+      setShowBatchResultDialog(true);
+      toast({
+        title: "Prenotazioni ricorrenti create",
+        description: result.message,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Errore",
+        description: error.message || "Impossibile creare le prenotazioni",
+        variant: "destructive",
+      });
+    },
+  });
+
   const editForm = useForm<InsertBooking>({
     resolver: zodResolver(insertBookingSchema),
     defaultValues: {
@@ -113,6 +189,51 @@ export default function AdminDashboard() {
       exactExitTime: '',
     },
   });
+
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const minDate = tomorrow.toISOString().split('T')[0];
+
+  const newForm = useForm<InsertBooking>({
+    resolver: zodResolver(insertBookingSchema),
+    defaultValues: {
+      dogName: '',
+      ownerName: '',
+      email: '',
+      serviceType: 'asilo',
+      startDate: minDate,
+      endDate: minDate,
+      entryTime: '7:30',
+      exitTime: '11:30-12:00',
+      exactEntryTime: '',
+      exactExitTime: '',
+    },
+  });
+
+  const newServiceType = newForm.watch('serviceType');
+
+  const recurringDates = useMemo(() => {
+    if (!isRecurring || selectedDays.length === 0) return [];
+    return generateRecurringDates(minDate, selectedDays, numWeeks);
+  }, [isRecurring, selectedDays, numWeeks, minDate]);
+
+  const resetNewForm = () => {
+    newForm.reset({
+      dogName: '',
+      ownerName: '',
+      email: '',
+      serviceType: 'asilo',
+      startDate: minDate,
+      endDate: minDate,
+      entryTime: '7:30',
+      exitTime: '11:30-12:00',
+      exactEntryTime: '',
+      exactExitTime: '',
+    });
+    setIsRecurring(false);
+    setSelectedDays([]);
+    setNumWeeks(4);
+  };
 
   useEffect(() => {
     if (adminStatus && !adminStatus.isAdmin) {
@@ -188,9 +309,59 @@ export default function AdminDashboard() {
     }
   };
 
+  useEffect(() => {
+    if (isRecurring && recurringDates.length > 0) {
+      newForm.setValue('startDate', recurringDates[0]);
+      newForm.setValue('endDate', recurringDates[0]);
+    }
+  }, [isRecurring, recurringDates, newForm]);
+
+  const onSubmitNew = (data: InsertBooking) => {
+    if (isRecurring) {
+      if (recurringDates.length === 0) {
+        toast({
+          title: "Errore",
+          description: "Seleziona almeno un giorno della settimana.",
+          variant: "destructive",
+        });
+        return;
+      }
+      createBatchMutation.mutate({
+        dogName: data.dogName,
+        ownerName: data.ownerName,
+        email: data.email,
+        serviceType: data.serviceType as 'asilo' | 'pensione',
+        entryTime: data.entryTime as any,
+        exitTime: data.exitTime as any,
+        exactEntryTime: data.exactEntryTime,
+        exactExitTime: data.exactExitTime,
+        dates: recurringDates,
+      });
+    } else {
+      createBookingMutation.mutate(data);
+    }
+  };
+
+  const toggleDay = (day: number) => {
+    setSelectedDays(prev =>
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort()
+    );
+  };
+
+  const formatDateShort = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('it-IT', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    });
+  };
+
   const sortedBookings = bookings ? [...bookings].sort((a, b) => {
     return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
   }) : [];
+
+  const isNewPending = createBookingMutation.isPending || createBatchMutation.isPending;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
@@ -248,10 +419,21 @@ export default function AdminDashboard() {
           <TabsContent value="bookings" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Tutte le Prenotazioni</CardTitle>
-                <CardDescription>
-                  Gestisci e visualizza tutte le prenotazioni
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Tutte le Prenotazioni</CardTitle>
+                    <CardDescription>
+                      Gestisci e visualizza tutte le prenotazioni
+                    </CardDescription>
+                  </div>
+                  <Button
+                    onClick={() => { resetNewForm(); setShowNewDialog(true); }}
+                    data-testid="button-new-booking"
+                  >
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                    Nuova Prenotazione
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
             {isLoading ? (
@@ -287,7 +469,7 @@ export default function AdminDashboard() {
                           {booking.ownerName}
                         </TableCell>
                         <TableCell>
-                          <Badge 
+                          <Badge
                             variant={booking.serviceType === 'pensione' ? 'default' : 'secondary'}
                             data-testid={`badge-service-${booking.id}`}
                           >
@@ -298,7 +480,7 @@ export default function AdminDashboard() {
                           {format(new Date(booking.startDate), "dd MMM yyyy", { locale: it })}
                         </TableCell>
                         <TableCell data-testid={`text-end-date-${booking.id}`}>
-                          {booking.endDate 
+                          {booking.endDate
                             ? format(new Date(booking.endDate), "dd MMM yyyy", { locale: it })
                             : '-'
                           }
@@ -361,7 +543,7 @@ export default function AdminDashboard() {
             <DialogHeader>
               <DialogTitle>Modifica Prenotazione</DialogTitle>
             </DialogHeader>
-            
+
             <Form {...editForm}>
               <form onSubmit={editForm.handleSubmit(onSubmitEdit)} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -532,16 +714,16 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="flex justify-end gap-2 pt-4">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={() => setShowEditDialog(false)}
                     data-testid="button-cancel-edit"
                   >
                     Annulla
                   </Button>
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={updateBookingMutation.isPending}
                     data-testid="button-save-edit"
                   >
@@ -550,6 +732,363 @@ export default function AdminDashboard() {
                 </div>
               </form>
             </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* New Booking Dialog */}
+        <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-new-booking">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <PlusCircle className="h-5 w-5 text-primary" />
+                Nuova Prenotazione
+              </DialogTitle>
+            </DialogHeader>
+
+            <Form {...newForm}>
+              <form onSubmit={newForm.handleSubmit(onSubmitNew)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={newForm.control}
+                    name="dogName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome Cane *</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Es. Max" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={newForm.control}
+                    name="ownerName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Proprietario *</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Es. Mario Rossi" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={newForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email *</FormLabel>
+                        <FormControl>
+                          <Input type="email" {...field} placeholder="Es. mario@email.com" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={newForm.control}
+                    name="serviceType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tipo Servizio *</FormLabel>
+                        <Select
+                          onValueChange={(val) => {
+                            field.onChange(val);
+                            if (isRecurring && val === 'asilo') {
+                              setSelectedDays(prev => prev.filter(d => d >= 1 && d <= 5));
+                            }
+                          }}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="asilo">Asilo</SelectItem>
+                            <SelectItem value="pensione">Pensione</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={newForm.control}
+                    name="entryTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Orario Entrata *</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="7:30">7:30</SelectItem>
+                            <SelectItem value="8:00-9:00">8:00-9:00</SelectItem>
+                            <SelectItem value="13:30-14:00">13:30-14:00</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={newForm.control}
+                    name="exitTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Orario Uscita *</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="8:00-9:00">8:00-9:00</SelectItem>
+                            <SelectItem value="11:30-12:00">11:30-12:00</SelectItem>
+                            <SelectItem value="17:00-18:00">17:00-18:00</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="border-2 border-border rounded-lg p-4 space-y-4">
+                  <div
+                    className="flex items-center justify-between cursor-pointer"
+                    onClick={() => setIsRecurring(!isRecurring)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Repeat size={16} className={cn("transition-colors", isRecurring ? "text-primary" : "text-muted-foreground")} />
+                      <span className="font-medium">Prenotazione Ricorrente</span>
+                    </div>
+                    <button
+                      type="button"
+                      className={cn(
+                        "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                        isRecurring ? "bg-primary" : "bg-muted"
+                      )}
+                      onClick={(e) => { e.stopPropagation(); setIsRecurring(!isRecurring); }}
+                    >
+                      <span className={cn(
+                        "inline-block h-4 w-4 rounded-full bg-white transition-transform",
+                        isRecurring ? "translate-x-6" : "translate-x-1"
+                      )} />
+                    </button>
+                  </div>
+
+                  {isRecurring && (
+                    <div className="space-y-4 pt-2 border-t border-border">
+                      <div>
+                        <p className="text-sm font-medium mb-2">Giorni della settimana</p>
+                        <div className="flex flex-wrap gap-2">
+                          {DAY_NAMES.map((name, index) => {
+                            const isWeekend = index === 0 || index === 6;
+                            const isDisabled = newServiceType === 'asilo' && isWeekend;
+                            return (
+                              <button
+                                key={index}
+                                type="button"
+                                disabled={isDisabled}
+                                onClick={() => toggleDay(index)}
+                                className={cn(
+                                  "px-3 py-1.5 rounded-lg text-sm font-medium border-2 transition-all",
+                                  selectedDays.includes(index)
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "border-border bg-card hover:border-primary/50",
+                                  isDisabled && "opacity-40 cursor-not-allowed hover:border-border"
+                                )}
+                              >
+                                {name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-sm font-medium mb-2">Numero di settimane</p>
+                        <div className="flex gap-2">
+                          {[2, 3, 4, 5, 6, 8].map((w) => (
+                            <button
+                              key={w}
+                              type="button"
+                              onClick={() => setNumWeeks(w)}
+                              className={cn(
+                                "px-3 py-1.5 rounded-lg text-sm font-medium border-2 transition-all",
+                                numWeeks === w
+                                  ? "bg-primary text-primary-foreground border-primary"
+                                  : "border-border bg-card hover:border-primary/50"
+                              )}
+                            >
+                              {w}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {recurringDates.length > 0 && (
+                        <div className="bg-primary/5 rounded-lg p-3">
+                          <p className="text-sm font-medium mb-2">
+                            {recurringDates.length} date selezionate:
+                          </p>
+                          <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                            {recurringDates.map((date) => (
+                              <span
+                                key={date}
+                                className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-md"
+                              >
+                                {formatDateShort(date)}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {!isRecurring && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={newForm.control}
+                      name="startDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Data Inizio *</FormLabel>
+                          <FormControl>
+                            <Input type="date" min={minDate} {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={newForm.control}
+                      name="endDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Data Fine *</FormLabel>
+                          <FormControl>
+                            <Input type="date" min={newForm.watch('startDate') || minDate} {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={newForm.control}
+                    name="exactEntryTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Orario Esatto Arrivo *</FormLabel>
+                        <FormControl>
+                          <Input type="time" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={newForm.control}
+                    name="exactExitTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Orario Esatto Ritiro *</FormLabel>
+                        <FormControl>
+                          <Input type="time" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowNewDialog(false)}
+                  >
+                    Annulla
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isNewPending || (isRecurring && recurringDates.length === 0)}
+                  >
+                    {isNewPending
+                      ? "Creazione..."
+                      : isRecurring
+                        ? `Crea ${recurringDates.length} Prenotazioni`
+                        : "Crea Prenotazione"
+                    }
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Batch Result Dialog */}
+        <Dialog open={showBatchResultDialog} onOpenChange={setShowBatchResultDialog}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Risultato Prenotazioni Ricorrenti</DialogTitle>
+            </DialogHeader>
+            {batchResult && (
+              <div className="space-y-4">
+                <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                  <p className="font-semibold text-green-800 dark:text-green-200 mb-2">
+                    {batchResult.created.length} prenotazioni create
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                    {batchResult.created.map((b) => (
+                      <span key={b.id} className="text-xs bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 px-2 py-1 rounded-md">
+                        {formatDateShort(b.startDate)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                {batchResult.skipped.length > 0 && (
+                  <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4">
+                    <p className="text-sm font-medium text-orange-800 dark:text-orange-200 mb-2">
+                      {batchResult.skipped.length} date saltate:
+                    </p>
+                    <div className="space-y-1">
+                      {batchResult.skipped.map((s, i) => (
+                        <div key={i} className="text-xs text-muted-foreground flex items-center gap-2">
+                          <XCircle size={12} className="text-orange-500" />
+                          {formatDateShort(s.date)} - {s.reason}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <Button onClick={() => setShowBatchResultDialog(false)} className="w-full">
+                  Chiudi
+                </Button>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>
@@ -577,7 +1116,7 @@ export default function AdminDashboard() {
                       <p className="text-lg font-semibold text-foreground">{newBookingData.ownerName}</p>
                     </div>
                   </div>
-                  
+
                   <div className="border-t border-border pt-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -590,7 +1129,7 @@ export default function AdminDashboard() {
                         <p className="text-sm text-muted-foreground">Date</p>
                         <p className="text-base font-medium text-foreground">
                           {format(new Date(newBookingData.startDate), 'dd/MM/yyyy', { locale: it })}
-                          {newBookingData.endDate && newBookingData.endDate !== newBookingData.startDate && 
+                          {newBookingData.endDate && newBookingData.endDate !== newBookingData.startDate &&
                             ` - ${format(new Date(newBookingData.endDate), 'dd/MM/yyyy', { locale: it })}`}
                         </p>
                       </div>
@@ -620,7 +1159,7 @@ export default function AdminDashboard() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction 
+            <AlertDialogAction
               className="w-full sm:w-auto"
               onClick={() => setShowNotificationDialog(false)}
               data-testid="button-close-notification"
