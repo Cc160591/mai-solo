@@ -181,11 +181,8 @@ export default function AdminDashboard() {
       return await apiRequest("POST", "/api/admin/logout");
     },
     onSuccess: () => {
-      toast({
-        title: "Logout effettuato",
-        description: "Sei stato disconnesso dall'area admin",
-      });
-      setLocation("/");
+      queryClient.clear();
+      window.location.href = "/";
     },
   });
 
