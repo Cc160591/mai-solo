@@ -145,61 +145,64 @@ export default function DailyBookings({ selectedDate, isAdmin = false }: DailyBo
               >
                 {showDetails ? (
                   <>
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                          <Dog className="text-primary" size={20} />
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-foreground" data-testid={`text-dog-name-${booking.id}`}>
-                            {booking.dogName}
-                          </h4>
-                          <p className="text-sm text-muted-foreground flex items-center gap-1" data-testid={`text-owner-name-${booking.id}`}>
-                            <User size={12} />
-                            {booking.ownerName}
-                          </p>
-                          {isAdmin && booking.email && (
-                            <p className="text-xs text-muted-foreground/70 mt-0.5" data-testid={`text-email-${booking.id}`}>
-                              {booking.email}
-                            </p>
-                          )}
-                        </div>
+                    {/* Badge servizio in cima */}
+                    <div className="flex items-center justify-between mb-3">
+                      <Badge
+                        className={getServiceColor(booking.serviceType)}
+                        data-testid={`badge-service-${booking.id}`}
+                      >
+                        {getServiceIcon(booking.serviceType)} {getServiceLabel(booking.serviceType)}
+                      </Badge>
+                      {booking.isOwn && (
+                        <span className="text-xs text-primary font-medium">Tua prenotazione</span>
+                      )}
+                    </div>
+                    {/* Info cane e proprietario */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-9 h-9 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
+                        <Dog className="text-primary" size={16} />
                       </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <Badge 
-                          className={getServiceColor(booking.serviceType)}
-                          data-testid={`badge-service-${booking.id}`}
-                        >
-                          {getServiceIcon(booking.serviceType)} {getServiceLabel(booking.serviceType)}
-                        </Badge>
-                        {booking.isOwn && <span className="text-xs text-primary font-medium">La tua prenotazione</span>}
+                      <div className="min-w-0">
+                        <h4 className="font-semibold text-foreground truncate" data-testid={`text-dog-name-${booking.id}`}>
+                          {booking.dogName}
+                        </h4>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 truncate" data-testid={`text-owner-name-${booking.id}`}>
+                          <User size={10} />
+                          {booking.ownerName}
+                        </p>
+                        {isAdmin && booking.email && (
+                          <p className="text-xs text-muted-foreground/60 truncate" data-testid={`text-email-${booking.id}`}>
+                            {booking.email}
+                          </p>
+                        )}
                       </div>
                     </div>
-                    <div className="space-y-2 text-sm">
+                    {/* Date e orari */}
+                    <div className="space-y-1.5 text-xs border-t border-border pt-2">
                       {booking.serviceType === 'pensione' && booking.endDate && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Calendar size={14} />
-                          <span data-testid={`text-date-range-${booking.id}`}>
-                            {formatDate(booking.startDate)} - {formatDate(booking.endDate)}
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Calendar size={11} />
+                          <span className="truncate" data-testid={`text-date-range-${booking.id}`}>
+                            {formatDate(booking.startDate)} → {formatDate(booking.endDate)}
                           </span>
                         </div>
                       )}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Clock size={14} />
+                      <div className="flex justify-between gap-2">
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Clock size={11} />
                           <span data-testid={`text-entry-time-${booking.id}`}>
-                            Entrata: <strong>{booking.entryTime}</strong>
+                            In: <strong>{booking.entryTime}</strong>
                             {booking.exactEntryTime && (
-                              <span className="ml-1 text-primary text-xs">({booking.exactEntryTime})</span>
+                              <span className="text-primary"> ({booking.exactEntryTime})</span>
                             )}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Clock size={14} />
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Clock size={11} />
                           <span data-testid={`text-exit-time-${booking.id}`}>
-                            Uscita: <strong>{booking.exitTime}</strong>
+                            Out: <strong>{booking.exitTime}</strong>
                             {booking.exactExitTime && (
-                              <span className="ml-1 text-primary text-xs">({booking.exactExitTime})</span>
+                              <span className="text-primary"> ({booking.exactExitTime})</span>
                             )}
                           </span>
                         </div>
