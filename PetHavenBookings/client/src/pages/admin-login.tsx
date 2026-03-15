@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { Lock } from "lucide-react";
 
 const loginSchema = z.object({
@@ -34,15 +34,8 @@ export default function AdminLogin() {
     try {
       await apiRequest("POST", "/api/admin/login", data);
 
-      // Invalida la cache per forzare il ricaricamento dello status admin
-      await queryClient.invalidateQueries({ queryKey: ["/api/admin/status"] });
-
-      toast({
-        title: "Accesso effettuato",
-        description: "Benvenuto nell'area amministrativa",
-      });
-
-      setLocation("/admin");
+      // Hard redirect so the session cookie is picked up fresh
+      window.location.href = "/admin";
     } catch (error: any) {
       toast({
         title: "Errore di autenticazione",
