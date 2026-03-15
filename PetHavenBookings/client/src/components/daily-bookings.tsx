@@ -207,26 +207,21 @@ export default function DailyBookings({ selectedDate, isAdmin = false }: DailyBo
                     </div>
                   </>
                 ) : (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
-                        <Lock className="text-muted-foreground" size={20} />
-                      </div>
-                      <div>
-                        <h4 className="font-medium text-muted-foreground" data-testid={`text-anonymous-${booking.id}`}>
-                          Prenotazione esistente
-                        </h4>
-                        <p className="text-sm text-muted-foreground/60">
-                          {getServiceIcon(booking.serviceType)} {getServiceLabel(booking.serviceType)} • {booking.entryTime} - {booking.exitTime}
-                        </p>
-                      </div>
+                  <div className="flex flex-col items-center justify-center text-center gap-3 py-2">
+                    <div className="w-10 h-10 bg-muted rounded-full flex items-center justify-center">
+                      <Lock className="text-muted-foreground" size={16} />
                     </div>
-                    <Badge 
-                      variant="outline"
-                      className="text-muted-foreground"
-                    >
-                      Riservato
-                    </Badge>
+                    <div>
+                      <Badge variant="outline" className="text-muted-foreground mb-1">
+                        Riservato
+                      </Badge>
+                      <p className="text-xs text-muted-foreground/70 mt-1">
+                        {getServiceIcon(booking.serviceType)} {getServiceLabel(booking.serviceType)}
+                      </p>
+                      <p className="text-xs text-muted-foreground/60">
+                        {booking.entryTime} → {booking.exitTime}
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
