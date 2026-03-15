@@ -370,7 +370,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           req.session.isAdmin = true;
-          return res.json({ success: true, message: "Login effettuato con successo" });
+          req.session.save((saveErr) => {
+            if (saveErr) {
+              console.error("Error saving session:", saveErr);
+              return res.status(500).json({ message: "Errore durante il login" });
+            }
+            return res.json({ success: true, message: "Login effettuato con successo" });
+          });
         });
       } else {
         return res.status(401).json({ message: "Password non corretta" });
