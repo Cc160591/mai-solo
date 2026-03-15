@@ -76,7 +76,7 @@ function BookingSection({ title, description, bookings, accentClass, badgeClass,
                   const prevDate = index > 0 ? bookings[index - 1].startDate : null;
                   if (currentDate !== prevDate) {
                     rows.push(
-                      <TableRow key={`date-${currentDate}`} className="bg-primary/5 hover:bg-primary/5">
+                      <TableRow key={`date-${currentDate}`} className="bg-violet-100 hover:bg-violet-100 dark:bg-violet-900/30">
                         <TableCell colSpan={8} className="py-2 px-4">
                           <span className="text-xs font-semibold text-primary uppercase tracking-wide">
                             📅 {format(new Date(currentDate), "EEEE dd MMMM yyyy", { locale: it })}
