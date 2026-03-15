@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
-import { LogOut, Trash2, Calendar, Bell, Edit, PlusCircle, Repeat, Info, XCircle } from "lucide-react";
+import { LogOut, Trash2, Calendar, Bell, Edit, PlusCircle, Repeat, Info, XCircle, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useForm } from "react-hook-form";
@@ -168,7 +168,7 @@ export default function AdminDashboard() {
   const [batchResult, setBatchResult] = useState<BatchBookingResult | null>(null);
   const [showBatchResultDialog, setShowBatchResultDialog] = useState(false);
 
-  const { data: adminStatus } = useQuery<{ isAdmin: boolean }>({
+  const { data: adminStatus, isLoading: isAdminStatusLoading } = useQuery<{ isAdmin: boolean }>({
     queryKey: ["/api/admin/status"],
   });
 
@@ -382,6 +382,17 @@ export default function AdminDashboard() {
       ws.close();
     };
   }, [toast]);
+
+  if (isAdminStatusLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Caricamento...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!adminStatus?.isAdmin) {
     return null;
