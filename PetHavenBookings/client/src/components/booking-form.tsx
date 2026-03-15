@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { api, type BatchBookingResult } from "@/lib/api";
-import { insertBookingSchema, type InsertBooking } from "@shared/schema";
+import { insertBookingSchema, type InsertBooking, type Booking } from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -49,11 +49,12 @@ function generateRecurringDates(startFromDate: string, selectedDays: number[], n
 
 export default function BookingForm({ selectedDate }: BookingFormProps) {
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [confirmedBooking, setConfirmedBooking] = useState<any>(null);
+  const [confirmedBooking, setConfirmedBooking] = useState<Booking | null>(null);
   const [batchResult, setBatchResult] = useState<BatchBookingResult | null>(null);
   const [isRecurring, setIsRecurring] = useState(false);
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [numWeeks, setNumWeeks] = useState(4);
+  const [recurringStartDate, setRecurringStartDate] = useState('');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -90,10 +91,12 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
   tomorrow.setDate(tomorrow.getDate() + 1);
   const minDate = tomorrow.toISOString().split('T')[0];
 
+  const effectiveRecurringStart = recurringStartDate && recurringStartDate >= minDate ? recurringStartDate : minDate;
+
   const recurringDates = useMemo(() => {
     if (!isRecurring || selectedDays.length === 0) return [];
-    return generateRecurringDates(minDate, selectedDays, numWeeks);
-  }, [isRecurring, selectedDays, numWeeks, minDate]);
+    return generateRecurringDates(effectiveRecurringStart, selectedDays, numWeeks);
+  }, [isRecurring, selectedDays, numWeeks, effectiveRecurringStart]);
 
   const effectiveStartDate = isRecurring && recurringDates.length > 0 ? recurringDates[0] : formStartDate;
   const effectiveEndDate = isRecurring && recurringDates.length > 0 ? recurringDates[recurringDates.length - 1] : formEndDate;
@@ -191,6 +194,7 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
     setIsRecurring(false);
     setSelectedDays([]);
     setNumWeeks(4);
+    setRecurringStartDate('');
     form.reset({
       dogName: '',
       ownerName: '',
@@ -227,8 +231,8 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
         ownerName: data.ownerName,
         email: data.email,
         serviceType: data.serviceType as 'asilo' | 'pensione',
-        entryTime: data.entryTime as any,
-        exitTime: data.exitTime as any,
+        entryTime: data.entryTime as '7:30' | '8:00-9:00' | '13:30-14:00',
+        exitTime: data.exitTime as '8:00-9:00' | '11:30-12:00' | '17:00-18:00',
         exactEntryTime: data.exactEntryTime,
         exactExitTime: data.exactExitTime,
         dates: recurringDates,
@@ -468,8 +472,21 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                 {isRecurring && (
                   <div className="space-y-4 pt-2 border-t border-border">
                     <p className="text-xs text-muted-foreground">
-                      Seleziona i giorni della settimana e per quante settimane ripetere la prenotazione.
+                      Seleziona la data di inizio, i giorni della settimana e per quante settimane ripetere.
                     </p>
+
+                    <div>
+                      <p className="text-sm font-medium mb-2">Data inizio ricorrenza</p>
+                      <Input
+                        type="date"
+                        min={minDate}
+                        value={recurringStartDate}
+                        onChange={(e) => setRecurringStartDate(e.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Le prenotazioni verranno create a partire da questa data
+                      </p>
+                    </div>
 
                     <div>
                       <p className="text-sm font-medium mb-2">Giorni della settimana</p>
@@ -506,7 +523,7 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                     <div>
                       <p className="text-sm font-medium mb-2">Numero di settimane</p>
                       <div className="flex gap-2">
-                        {[2, 3, 4, 5, 6, 8].map((w) => (
+                        {[2, 3, 4, 5, 6, 7, 8].map((w) => (
                           <button
                             key={w}
                             type="button"
@@ -619,7 +636,7 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                           key={time}
                           value={time}
                           selected={formEntryTime === time}
-                          onClick={() => form.setValue('entryTime', time as any)}
+                          onClick={() => form.setValue('entryTime', time)}
                           testId={`button-entry-${time}`}
                         >
                           {time}
@@ -668,7 +685,7 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                           key={time}
                           value={time}
                           selected={formExitTime === time}
-                          onClick={() => form.setValue('exitTime', time as any)}
+                          onClick={() => form.setValue('exitTime', time)}
                           testId={`button-exit-${time}`}
                         >
                           {time}

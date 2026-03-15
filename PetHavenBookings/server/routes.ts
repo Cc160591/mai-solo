@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { insertBookingSchema, batchBookingSchema, type InsertBooking, insertClosureSchema, insertClosureRangeSchema } from "@shared/schema";
+import { insertBookingSchema, batchBookingSchema, type InsertBooking, type Booking, insertClosureSchema, insertClosureRangeSchema } from "@shared/schema";
 import { requireAdmin, checkAdminPassword } from "./auth";
 import { z } from "zod";
 import { sendBookingNotification } from "./email";
@@ -263,7 +263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       tomorrow.setDate(tomorrow.getDate() + 1);
       const minDate = tomorrow.toISOString().split('T')[0];
 
-      const created: any[] = [];
+      const created: Booking[] = [];
       const skipped: { date: string; reason: string }[] = [];
 
       for (const date of dates) {
