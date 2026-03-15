@@ -71,59 +71,75 @@ function BookingSection({ title, description, bookings, accentClass, badgeClass,
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {bookings.map((booking) => (
-                  <TableRow key={booking.id} data-testid={`row-booking-${booking.id}`}>
-                    <TableCell className="font-medium text-gray-400">{booking.id}</TableCell>
-                    <TableCell className="font-medium" data-testid={`text-dog-${booking.id}`}>
-                      {booking.dogName}
-                    </TableCell>
-                    <TableCell data-testid={`text-owner-${booking.id}`}>
-                      {booking.ownerName}
-                    </TableCell>
-                    <TableCell data-testid={`text-start-date-${booking.id}`}>
-                      {format(new Date(booking.startDate), "dd MMM yyyy", { locale: it })}
-                    </TableCell>
-                    <TableCell data-testid={`text-end-date-${booking.id}`}>
-                      {booking.endDate && booking.endDate !== booking.startDate
-                        ? format(new Date(booking.endDate), "dd MMM yyyy", { locale: it })
-                        : <span className="text-gray-400">—</span>
-                      }
-                    </TableCell>
-                    <TableCell data-testid={`text-entry-${booking.id}`}>
-                      <span className="font-medium">{booking.entryTime}</span>
-                      {booking.exactEntryTime && (
-                        <span className="text-xs text-gray-400 block">({booking.exactEntryTime})</span>
-                      )}
-                    </TableCell>
-                    <TableCell data-testid={`text-exit-${booking.id}`}>
-                      <span className="font-medium">{booking.exitTime}</span>
-                      {booking.exactExitTime && (
-                        <span className="text-xs text-gray-400 block">({booking.exactExitTime})</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex gap-1 justify-end">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onEdit(booking)}
-                          data-testid={`button-edit-${booking.id}`}
-                        >
-                          <Edit className="h-4 w-4 text-primary" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onDelete(booking.id, booking.dogName)}
-                          disabled={deleteIsPending}
-                          data-testid={`button-delete-${booking.id}`}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {bookings.reduce((rows, booking, index) => {
+                  const currentDate = booking.startDate;
+                  const prevDate = index > 0 ? bookings[index - 1].startDate : null;
+                  if (currentDate !== prevDate) {
+                    rows.push(
+                      <TableRow key={`date-${currentDate}`} className="bg-primary/5 hover:bg-primary/5">
+                        <TableCell colSpan={8} className="py-2 px-4">
+                          <span className="text-xs font-semibold text-primary uppercase tracking-wide">
+                            📅 {format(new Date(currentDate), "EEEE dd MMMM yyyy", { locale: it })}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  }
+                  rows.push(
+                    <TableRow key={booking.id} data-testid={`row-booking-${booking.id}`}>
+                      <TableCell className="font-medium text-gray-400">{booking.id}</TableCell>
+                      <TableCell className="font-medium" data-testid={`text-dog-${booking.id}`}>
+                        {booking.dogName}
+                      </TableCell>
+                      <TableCell data-testid={`text-owner-${booking.id}`}>
+                        {booking.ownerName}
+                      </TableCell>
+                      <TableCell data-testid={`text-start-date-${booking.id}`}>
+                        {format(new Date(booking.startDate), "dd MMM yyyy", { locale: it })}
+                      </TableCell>
+                      <TableCell data-testid={`text-end-date-${booking.id}`}>
+                        {booking.endDate && booking.endDate !== booking.startDate
+                          ? format(new Date(booking.endDate), "dd MMM yyyy", { locale: it })
+                          : <span className="text-gray-400">—</span>
+                        }
+                      </TableCell>
+                      <TableCell data-testid={`text-entry-${booking.id}`}>
+                        <span className="font-medium">{booking.entryTime}</span>
+                        {booking.exactEntryTime && (
+                          <span className="text-xs text-gray-400 block">({booking.exactEntryTime})</span>
+                        )}
+                      </TableCell>
+                      <TableCell data-testid={`text-exit-${booking.id}`}>
+                        <span className="font-medium">{booking.exitTime}</span>
+                        {booking.exactExitTime && (
+                          <span className="text-xs text-gray-400 block">({booking.exactExitTime})</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex gap-1 justify-end">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onEdit(booking)}
+                            data-testid={`button-edit-${booking.id}`}
+                          >
+                            <Edit className="h-4 w-4 text-primary" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onDelete(booking.id, booking.dogName)}
+                            disabled={deleteIsPending}
+                            data-testid={`button-delete-${booking.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                  return rows;
+                }, [] as React.ReactNode[])}
               </TableBody>
             </Table>
           </div>
@@ -476,7 +492,7 @@ export default function AdminDashboard() {
   };
 
   const sortedBookings = bookings ? [...bookings].sort((a, b) => {
-    return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
+    return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
   }) : [];
 
   const isNewPending = createBookingMutation.isPending || createBatchMutation.isPending;
