@@ -394,7 +394,7 @@ export default function AdminDashboard() {
     );
   }
 
-  if (!adminStatus?.isAdmin) {
+  if (adminStatus && !adminStatus.isAdmin) {
     return null;
   }
 
