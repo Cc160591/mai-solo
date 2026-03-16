@@ -445,10 +445,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const validationResult = partialBookingSchema.safeParse(req.body);
       if (!validationResult.success) {
-        return res.status(400).json({ 
-          message: "Dati prenotazione non validi", 
-          errors: validationResult.error.errors 
+        return res.status(400).json({
+          message: "Dati prenotazione non validi",
+          errors: validationResult.error.errors
         });
+      }
+
+      // Check edit deadline: allowed only until 20:00 of the day before startDate
+      const existingBooking = await storage.getBooking(id);
+      if (!existingBooking) {
+        return res.status(404).json({ message: "Prenotazione non trovata" });
+      }
+      const startDate = new Date(existingBooking.startDate);
+      const deadline = new Date(startDate);
+      deadline.setDate(deadline.getDate() - 1);
+      deadline.setHours(20, 0, 0, 0);
+      if (new Date() > deadline) {
+        return res.status(403).json({ message: "Modifica non consentita: il termine per modificare questa prenotazione è scaduto (entro le 20:00 del giorno prima)." });
       }
 
       const booking = await storage.updateBooking(id, validationResult.data);
