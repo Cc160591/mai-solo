@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, serial, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -138,3 +138,26 @@ export const insertClosureRangeSchema = z.object({
 export type InsertClosure = z.infer<typeof insertClosureSchema>;
 export type InsertClosureRange = z.infer<typeof insertClosureRangeSchema>;
 export type Closure = typeof closures.$inferSelect;
+
+// Capacity overrides table for admin-managed per-day capacity reduction
+export const capacityOverrides = pgTable("capacity_overrides", {
+  id: serial("id").primaryKey(),
+  date: text("date").notNull().unique(), // DATE format YYYY-MM-DD
+  morningCapacity: integer("morning_capacity").notNull(), // 0-9
+  afternoonCapacity: integer("afternoon_capacity").notNull(), // 0-9
+  notes: text("notes"), // Optional reason
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertCapacityOverrideSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data non valida"),
+  morningCapacity: z.number().int().min(0).max(9),
+  afternoonCapacity: z.number().int().min(0).max(9),
+  notes: z.preprocess(
+    (val) => val === '' ? undefined : val,
+    z.string().optional()
+  ),
+});
+
+export type InsertCapacityOverride = z.infer<typeof insertCapacityOverrideSchema>;
+export type CapacityOverride = typeof capacityOverrides.$inferSelect;

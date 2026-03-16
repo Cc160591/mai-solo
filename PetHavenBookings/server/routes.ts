@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { insertBookingSchema, batchBookingSchema, type InsertBooking, type Booking, insertClosureSchema, insertClosureRangeSchema } from "@shared/schema";
+import { insertBookingSchema, batchBookingSchema, type InsertBooking, type Booking, insertClosureSchema, insertClosureRangeSchema, insertCapacityOverrideSchema } from "@shared/schema";
 import { requireAdmin, checkAdminPassword } from "./auth";
 import { z } from "zod";
 import { sendBookingNotification } from "./email";
@@ -616,7 +616,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/admin/closures/:id", requireAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      
+
       if (isNaN(id)) {
         return res.status(400).json({ message: "ID non valido" });
       }
@@ -625,6 +625,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, message: "Chiusura eliminata con successo" });
     } catch (error) {
       console.error("Error deleting closure:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get all capacity overrides (admin only)
+  app.get("/api/admin/capacity-overrides", requireAdmin, async (req, res) => {
+    try {
+      const overrides = await storage.getAllCapacityOverrides();
+      res.json(overrides);
+    } catch (error) {
+      console.error("Error getting capacity overrides:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Create or update capacity override for a date (admin only)
+  app.post("/api/admin/capacity-overrides", requireAdmin, async (req, res) => {
+    try {
+      const validation = insertCapacityOverrideSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "Dati non validi", errors: validation.error.errors });
+      }
+      const override = await storage.setCapacityOverride(validation.data);
+      res.status(201).json(override);
+    } catch (error) {
+      console.error("Error setting capacity override:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Delete capacity override (admin only)
+  app.delete("/api/admin/capacity-overrides/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "ID non valido" });
+      }
+      await storage.deleteCapacityOverride(id);
+      res.json({ success: true, message: "Override eliminato con successo" });
+    } catch (error) {
+      console.error("Error deleting capacity override:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });

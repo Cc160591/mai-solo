@@ -1,4 +1,4 @@
-import { type Booking, type InsertBooking, bookings, type Closure, type InsertClosure, closures } from "@shared/schema";
+import { type Booking, type InsertBooking, bookings, type Closure, type InsertClosure, closures, type CapacityOverride, type InsertCapacityOverride, capacityOverrides } from "@shared/schema";
 import { database } from "./database";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 
@@ -20,6 +20,12 @@ export interface IStorage {
   createClosure(closure: InsertClosure): Promise<Closure>;
   deleteClosure(id: number): Promise<void>;
   getAllClosures(): Promise<Closure[]>;
+
+  // Capacity override management
+  getCapacityOverrideByDate(date: string): Promise<CapacityOverride | undefined>;
+  getAllCapacityOverrides(): Promise<CapacityOverride[]>;
+  setCapacityOverride(data: InsertCapacityOverride): Promise<CapacityOverride>;
+  deleteCapacityOverride(id: number): Promise<void>;
 }
 
 export class SQLiteStorage implements IStorage {
@@ -84,15 +90,20 @@ export class SQLiteStorage implements IStorage {
   }
 
   async getAvailability(date: string): Promise<{morning: number, afternoon: number}> {
-    const bookingsForDate = await this.getBookingsByDate(date);
-    const totalCapacity = 9;
-    
+    const [bookingsForDate, override] = await Promise.all([
+      this.getBookingsByDate(date),
+      this.getCapacityOverrideByDate(date),
+    ]);
+
+    const morningCapacity = override ? override.morningCapacity : 9;
+    const afternoonCapacity = override ? override.afternoonCapacity : 9;
+
     // Count bookings for morning (7:30 or 8:00-9:00) and afternoon (13:30-14:00)
     // Pensione occupies both morning and afternoon
     // Asilo that enters in morning and exits in afternoon occupies both slots
     let morningOccupied = 0;
     let afternoonOccupied = 0;
-    
+
     for (const booking of bookingsForDate) {
       if (booking.serviceType === 'pensione') {
         // Pensione always occupies both slots
@@ -110,10 +121,10 @@ export class SQLiteStorage implements IStorage {
         afternoonOccupied++;
       }
     }
-    
+
     return {
-      morning: Math.max(0, totalCapacity - morningOccupied),
-      afternoon: Math.max(0, totalCapacity - afternoonOccupied)
+      morning: Math.max(0, morningCapacity - morningOccupied),
+      afternoon: Math.max(0, afternoonCapacity - afternoonOccupied)
     };
   }
 
@@ -165,6 +176,35 @@ export class SQLiteStorage implements IStorage {
   async getAllClosures(): Promise<Closure[]> {
     const result = await database.select().from(closures);
     return result as Closure[];
+  }
+
+  // Capacity override management methods
+  async getCapacityOverrideByDate(date: string): Promise<CapacityOverride | undefined> {
+    const result = await database.select().from(capacityOverrides).where(eq(capacityOverrides.date, date));
+    return result[0] as CapacityOverride | undefined;
+  }
+
+  async getAllCapacityOverrides(): Promise<CapacityOverride[]> {
+    const result = await database.select().from(capacityOverrides);
+    return result as CapacityOverride[];
+  }
+
+  async setCapacityOverride(data: InsertCapacityOverride): Promise<CapacityOverride> {
+    // Upsert: if override for this date already exists, update it
+    const existing = await this.getCapacityOverrideByDate(data.date);
+    if (existing) {
+      const result = await database.update(capacityOverrides)
+        .set({ morningCapacity: data.morningCapacity, afternoonCapacity: data.afternoonCapacity, notes: data.notes })
+        .where(eq(capacityOverrides.id, existing.id))
+        .returning();
+      return result[0] as CapacityOverride;
+    }
+    const result = await database.insert(capacityOverrides).values(data).returning();
+    return result[0] as CapacityOverride;
+  }
+
+  async deleteCapacityOverride(id: number): Promise<void> {
+    await database.delete(capacityOverrides).where(eq(capacityOverrides.id, id));
   }
 }
 

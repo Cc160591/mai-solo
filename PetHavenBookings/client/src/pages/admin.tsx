@@ -23,6 +23,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertBookingSchema, type Booking, type InsertBooking } from "@shared/schema";
 import { ClosuresManagement } from "@/components/closures-management";
+import { CapacityOverrides } from "@/components/capacity-overrides";
 import { cn } from "@/lib/utils";
 
 const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
@@ -549,6 +550,9 @@ export default function AdminDashboard() {
             <TabsTrigger value="closures" data-testid="tab-closures">
               Chiusure
             </TabsTrigger>
+            <TabsTrigger value="capacity" data-testid="tab-capacity">
+              Posti Disponibili
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="bookings" className="space-y-4">
@@ -609,6 +613,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="closures" className="space-y-4">
             <ClosuresManagement />
+          </TabsContent>
+
+          <TabsContent value="capacity" className="space-y-4">
+            <CapacityOverrides />
           </TabsContent>
         </Tabs>
 
