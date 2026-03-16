@@ -121,8 +121,7 @@ function BookingSection({ title, description, bookings, accentClass, badgeClass,
                             variant="ghost"
                             size="sm"
                             onClick={() => onEdit(booking)}
-                            disabled={(() => { const d = new Date(booking.startDate); d.setDate(d.getDate() - 1); d.setHours(20, 0, 0, 0); return new Date() > d; })()}
-                            title={(() => { const d = new Date(booking.startDate); d.setDate(d.getDate() - 1); d.setHours(20, 0, 0, 0); return new Date() > d ? "Termine scaduto: modifiche consentite entro le 20:00 del giorno prima" : "Modifica prenotazione"; })()}
+                            title="Modifica prenotazione"
                             data-testid={`button-edit-${booking.id}`}
                           >
                             <Edit className="h-4 w-4 text-primary" />
