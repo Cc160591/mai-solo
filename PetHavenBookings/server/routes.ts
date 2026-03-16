@@ -475,6 +475,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update booking (client - own bookings only, with deadline check)
+  app.patch("/api/bookings/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "ID non valido" });
+
+      const { email, ...updateData } = req.body;
+      if (!email) return res.status(400).json({ message: "Email richiesta per la modifica" });
+
+      const existingBooking = await storage.getBooking(id);
+      if (!existingBooking) return res.status(404).json({ message: "Prenotazione non trovata" });
+      if (existingBooking.email !== email) return res.status(403).json({ message: "Non autorizzato a modificare questa prenotazione" });
+
+      const deadline = new Date(existingBooking.startDate);
+      deadline.setDate(deadline.getDate() - 1);
+      deadline.setHours(20, 0, 0, 0);
+      if (new Date() > deadline) {
+        return res.status(403).json({ message: "Termine scaduto: modifiche consentite entro le 20:00 del giorno prima." });
+      }
+
+      const partialSchema = z.object({
+        entryTime: z.enum(['7:30', '8:00-9:00', '13:30-14:00']).optional(),
+        exitTime: z.enum(['8:00-9:00', '11:30-12:00', '17:00-18:00']).optional(),
+        exactEntryTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+        exactExitTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+      });
+      const validation = partialSchema.safeParse(updateData);
+      if (!validation.success) return res.status(400).json({ message: "Dati non validi" });
+
+      const booking = await storage.updateBooking(id, validation.data);
+      res.json(booking);
+    } catch (error) {
+      console.error("Error updating booking:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Delete booking (admin only)
   app.delete("/api/admin/bookings/:id", requireAdmin, async (req, res) => {
     try {
