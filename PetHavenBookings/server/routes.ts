@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { insertBookingSchema, batchBookingSchema, type InsertBooking, type Booking, insertClosureSchema, insertClosureRangeSchema, insertCapacityOverrideSchema } from "@shared/schema";
 import { requireAdmin, checkAdminPassword } from "./auth";
 import { z } from "zod";
-import { sendBookingNotification } from "./email";
+import { sendBookingNotification, sendBookingConfirmation, sendBatchBookingConfirmation } from "./email";
 import { checkClosureConflicts, formatShortDate } from "@shared/utils";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -74,6 +74,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(filteredBookings);
     } catch (error) {
       console.error("Error getting bookings:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get all bookings for a specific email (customer "my bookings" view)
+  app.get("/api/my-bookings", async (req, res) => {
+    try {
+      const email = req.query.email as string;
+      if (!email) return res.status(400).json({ message: "Email richiesta" });
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        return res.status(400).json({ message: "Email non valida" });
+      }
+
+      const userBookings = await storage.getBookingsByEmail(email);
+      res.json(userBookings);
+    } catch (error) {
+      console.error("Error getting bookings by email:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -224,8 +243,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (app as any).notifyAdmins(booking);
       }
       
-      // Send email notification (non-blocking)
-      sendBookingNotification({
+      // Send email notifications (non-blocking)
+      const emailData = {
         dogName: booking.dogName,
         ownerName: booking.ownerName,
         serviceType: booking.serviceType as 'asilo' | 'pensione',
@@ -235,8 +254,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         exitTime: booking.exitTime,
         exactEntryTime: booking.exactEntryTime,
         exactExitTime: booking.exactExitTime,
-      }).catch(err => console.error('Email notification error:', err));
-      
+      };
+      sendBookingNotification(emailData).catch(err => console.error('Admin notification error:', err));
+      sendBookingConfirmation({ ...emailData, customerEmail: booking.email }).catch(err => console.error('Customer confirmation error:', err));
+
       res.status(201).json(booking);
       
     } catch (error) {
@@ -340,6 +361,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           skipped,
         });
       }
+
+      // Send batch confirmation to customer (non-blocking)
+      sendBatchBookingConfirmation(created, bookingBase.email).catch(err => console.error('Batch confirmation error:', err));
 
       res.status(201).json({
         message: `${created.length} prenotazioni create con successo${skipped.length > 0 ? `, ${skipped.length} saltate` : ''}`,

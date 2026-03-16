@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(psql:*)",
+      "Bash(pg_isready)",
+      "Bash(createdb pethaven:*)",
+      "Bash(pg_dump \"postgresql://neondb_owner:npg_8zsSoecvf5mF@ep-square-thunder-airxgmc5.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require\" 2>&1 | head -20)",
+      "Bash(brew install:*)",
+      "Bash(cd:*)",
+      "Bash(lsof:*)",
+      "Bash(git add:*)",
+      "Bash(gh auth:*)",
+      "Bash(gh repo:*)",
+      "Bash(git config:*)",
+      "Bash(/opt/homebrew/opt/postgresql@16/bin/psql \"postgresql://postgres:wQKpdRcRgUHhsLGuRGNrrjwqOunTgmeQ@shinkansen.proxy.rlwy.net:58912/railway\" -c \"SELECT COUNT\\(*\\) as bookings FROM bookings;\" && /opt/homebrew/opt/postgresql@16/bin/psql \"postgresql://postgres:wQKpdRcRgUHhsLGuRGNrrjwqOunTgmeQ@shinkansen.proxy.rlwy.net:58912/railway\" -c \"SELECT COUNT\\(*\\) as closures FROM closures;\")",
+      "WebFetch(domain:mai-solo-production.up.railway.app)",
+      "Bash(npx drizzle-kit:*)",
+      "Bash(node:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:wQKpdRcRgUHhsLGuRGNrrjwqOunTgmeQ@shinkansen.proxy.rlwy.net:58912/railway\" npx drizzle-kit push 2>&1)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:wQKpdRcRgUHhsLGuRGNrrjwqOunTgmeQ@shinkansen.proxy.rlwy.net:58912/railway\" node -e \"\nconst pg = require\\('pg'\\);\nconst pool = new pg.Pool\\({ connectionString: process.env.DATABASE_URL }\\);\npool.query\\(\\\\`\n  CREATE TABLE IF NOT EXISTS capacity_overrides \\(\n    id SERIAL PRIMARY KEY,\n    date TEXT NOT NULL UNIQUE,\n    morning_capacity INTEGER NOT NULL,\n    afternoon_capacity INTEGER NOT NULL,\n    notes TEXT,\n    created_at TIMESTAMP DEFAULT NOW\\(\\) NOT NULL\n  \\)\n\\\\`\\).then\\(\\(\\) => { console.log\\('Table created successfully'\\); pool.end\\(\\); }\\)\n  .catch\\(err => { console.error\\('Error:', err.message\\); pool.end\\(\\); }\\);\n\" 2>&1)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(git push:*)"
+    ]
+  }
+}

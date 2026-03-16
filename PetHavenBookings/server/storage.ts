@@ -1,10 +1,11 @@
 import { type Booking, type InsertBooking, bookings, type Closure, type InsertClosure, closures, type CapacityOverride, type InsertCapacityOverride, capacityOverrides } from "@shared/schema";
 import { database } from "./database";
-import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { eq, and, gte, lte, sql, asc } from "drizzle-orm";
 
 export interface IStorage {
   getBooking(id: number): Promise<Booking | undefined>;
   getBookingsByDate(date: string): Promise<Booking[]>;
+  getBookingsByEmail(email: string): Promise<Booking[]>;
   getBookingsInDateRange(startDate: string, endDate: string): Promise<Booking[]>;
   getAllBookings(): Promise<Booking[]>;
   createBooking(booking: InsertBooking): Promise<Booking>;
@@ -42,6 +43,14 @@ export class SQLiteStorage implements IStorage {
           gte(bookings.endDate, date)
         )
       );
+    return result as Booking[];
+  }
+
+  async getBookingsByEmail(email: string): Promise<Booking[]> {
+    const normalizedEmail = email.toLowerCase().trim();
+    const result = await database.select().from(bookings)
+      .where(sql`LOWER(${bookings.email}) = ${normalizedEmail}`)
+      .orderBy(asc(bookings.startDate));
     return result as Booking[];
   }
 

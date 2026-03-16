@@ -7,7 +7,7 @@ import DailyBookings from "@/components/daily-bookings";
 import IdentifyEmailDialog from "@/components/identify-email-dialog";
 import OnboardingTour from "@/components/onboarding-tour";
 import { Button } from "@/components/ui/button";
-import { Shield, HelpCircle } from "lucide-react";
+import { Shield, HelpCircle, BookOpen } from "lucide-react";
 
 export default function Home() {
   const [selectedDate, setSelectedDate] = useState<string>(() => {
@@ -56,6 +56,15 @@ export default function Home() {
               >
                 <HelpCircle className="h-4 w-4" />
                 <span className="hidden sm:inline">Guida</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setLocation("/mie-prenotazioni")}
+                className="gap-2"
+              >
+                <BookOpen className="h-4 w-4" />
+                <span className="hidden sm:inline">Le mie prenotazioni</span>
               </Button>
               <Button
                 variant="outline"
