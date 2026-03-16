@@ -858,12 +858,7 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                 <div className="flex gap-3">
                   <Info className="text-accent mt-0.5" size={16} />
                   <div className="text-sm">
-                    <p className="font-medium text-accent-foreground mb-1">Cosa portare:</p>
-                    <ul className="text-xs text-muted-foreground space-y-1">
-                      <li>• Libretto sanitario aggiornato</li>
-                      <li>• Ciotola personale (opzionale)</li>
-                      <li>• Giochi preferiti</li>
-                    </ul>
+                    <p className="text-xs text-muted-foreground">Ricorda di portare la pappa se prevista dalla loro routine.</p>
                   </div>
                 </div>
               </div>
