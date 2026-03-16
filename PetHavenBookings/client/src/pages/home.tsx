@@ -57,18 +57,16 @@ export default function Home() {
                 <HelpCircle className="h-4 w-4" />
                 <span className="hidden sm:inline">Guida</span>
               </Button>
-              {adminStatus?.isAdmin && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setLocation("/admin")}
-                  className="gap-2"
-                  data-testid="button-admin-dashboard"
-                >
-                  <Shield className="h-4 w-4" />
-                  <span className="hidden sm:inline">Dashboard Admin</span>
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setLocation("/admin")}
+                className="gap-2"
+                data-testid="button-admin-dashboard"
+              >
+                <Shield className="h-4 w-4" />
+                <span className="hidden sm:inline">{adminStatus?.isAdmin ? "Dashboard Admin" : "Accesso Admin"}</span>
+              </Button>
               <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
                 <i className="far fa-clock"></i>
                 <span>Lun-Dom: 8:00-18:00</span>
