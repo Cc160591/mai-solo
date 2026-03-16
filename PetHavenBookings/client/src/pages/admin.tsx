@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
-import { LogOut, Trash2, Calendar, Bell, Edit, PlusCircle, Repeat, Info, XCircle, Loader2 } from "lucide-react";
+import { LogOut, Trash2, Calendar, Bell, Edit, PlusCircle, Repeat, Info, XCircle, Loader2, Archive, Search } from "lucide-react";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useForm } from "react-hook-form";
@@ -185,6 +185,7 @@ export default function AdminDashboard() {
   const [recurringStartDate, setRecurringStartDate] = useState('');
   const [batchResult, setBatchResult] = useState<BatchBookingResult | null>(null);
   const [showBatchResultDialog, setShowBatchResultDialog] = useState(false);
+  const [archiveSearch, setArchiveSearch] = useState('');
 
   const { data: adminStatus, isLoading: isAdminStatusLoading } = useQuery<{ isAdmin: boolean }>({
     queryKey: ["/api/admin/status"],
@@ -497,6 +498,18 @@ export default function AdminDashboard() {
     return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
   }) : [];
 
+  const todayStr = new Date().toISOString().split('T')[0];
+  const activeBookings = sortedBookings.filter(b => b.endDate >= todayStr);
+  const archivedBookings = sortedBookings
+    .filter(b => b.endDate < todayStr)
+    .reverse(); // più recenti prima
+
+  const filteredArchive = archivedBookings.filter(b => {
+    if (!archiveSearch.trim()) return true;
+    const q = archiveSearch.toLowerCase();
+    return b.dogName.toLowerCase().includes(q) || b.ownerName.toLowerCase().includes(q) || b.email?.toLowerCase().includes(q);
+  });
+
   const isNewPending = createBookingMutation.isPending || createBatchMutation.isPending;
 
   return (
@@ -547,6 +560,15 @@ export default function AdminDashboard() {
             <TabsTrigger value="bookings" data-testid="tab-bookings">
               Prenotazioni
             </TabsTrigger>
+            <TabsTrigger value="archive" data-testid="tab-archive">
+              <Archive className="h-4 w-4 mr-1" />
+              Archivio
+              {archivedBookings.length > 0 && (
+                <span className="ml-1.5 bg-muted text-muted-foreground text-xs px-1.5 py-0.5 rounded-full">
+                  {archivedBookings.length}
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="closures" data-testid="tab-closures">
               Chiusure
             </TabsTrigger>
@@ -560,10 +582,10 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  Gestione Prenotazioni
+                  Prenotazioni Attive
                 </h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {sortedBookings.length} prenotazioni totali
+                  {activeBookings.length} prenotazioni in corso o future
                 </p>
               </div>
               <Button
@@ -587,7 +609,7 @@ export default function AdminDashboard() {
                   <BookingSection
                     title="🌙 Pensione"
                     description="Soggiorni notturni e multi-giorno"
-                    bookings={sortedBookings.filter(b => b.serviceType === 'pensione')}
+                    bookings={activeBookings.filter(b => b.serviceType === 'pensione')}
                     accentClass="border-l-4 border-l-indigo-500"
                     badgeClass="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200"
                     onEdit={handleEdit}
@@ -599,7 +621,7 @@ export default function AdminDashboard() {
                   <BookingSection
                     title="☀️ Asilo"
                     description="Servizio giornaliero lunedì-venerdì"
-                    bookings={sortedBookings.filter(b => b.serviceType === 'asilo')}
+                    bookings={activeBookings.filter(b => b.serviceType === 'asilo')}
                     accentClass="border-l-4 border-l-amber-500"
                     badgeClass="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
                     onEdit={handleEdit}
@@ -607,6 +629,95 @@ export default function AdminDashboard() {
                     deleteIsPending={deleteBookingMutation.isPending}
                   />
                 </TabsContent>
+              </Tabs>
+            )}
+          </TabsContent>
+
+          <TabsContent value="archive" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  Archivio Prenotazioni
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Prenotazioni concluse — archiviate automaticamente
+                </p>
+              </div>
+              {archivedBookings.length > 0 && (
+                <div className="flex gap-3">
+                  <div className="text-center bg-indigo-50 dark:bg-indigo-900/30 rounded-lg px-4 py-2">
+                    <p className="text-2xl font-bold text-indigo-700 dark:text-indigo-300">
+                      {archivedBookings.filter(b => b.serviceType === 'pensione').length}
+                    </p>
+                    <p className="text-xs text-indigo-600 dark:text-indigo-400">Pensioni</p>
+                  </div>
+                  <div className="text-center bg-amber-50 dark:bg-amber-900/30 rounded-lg px-4 py-2">
+                    <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">
+                      {archivedBookings.filter(b => b.serviceType === 'asilo').length}
+                    </p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400">Asili</p>
+                  </div>
+                  <div className="text-center bg-gray-50 dark:bg-gray-800 rounded-lg px-4 py-2">
+                    <p className="text-2xl font-bold text-gray-700 dark:text-gray-300">
+                      {archivedBookings.length}
+                    </p>
+                    <p className="text-xs text-gray-500">Totale</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Cerca per cane, proprietario o email..."
+                value={archiveSearch}
+                onChange={e => setArchiveSearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+
+            {isLoading ? (
+              <div className="text-center py-12">Caricamento...</div>
+            ) : archivedBookings.length === 0 ? (
+              <Card>
+                <CardContent className="py-16 text-center">
+                  <Archive className="mx-auto h-12 w-12 text-muted-foreground/30 mb-4" />
+                  <p className="text-muted-foreground font-medium">Nessuna prenotazione archiviata</p>
+                  <p className="text-sm text-muted-foreground/70 mt-1">
+                    Le prenotazioni passate appariranno qui automaticamente
+                  </p>
+                </CardContent>
+              </Card>
+            ) : filteredArchive.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <p className="text-muted-foreground">Nessun risultato per "{archiveSearch}"</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Tabs defaultValue="all">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="all">Tutte ({filteredArchive.length})</TabsTrigger>
+                  <TabsTrigger value="pensione">🌙 Pensione ({filteredArchive.filter(b => b.serviceType === 'pensione').length})</TabsTrigger>
+                  <TabsTrigger value="asilo">☀️ Asilo ({filteredArchive.filter(b => b.serviceType === 'asilo').length})</TabsTrigger>
+                </TabsList>
+                {(['all', 'pensione', 'asilo'] as const).map(tab => (
+                  <TabsContent key={tab} value={tab}>
+                    <BookingSection
+                      title={tab === 'all' ? '📦 Tutte le prenotazioni archiviate' : tab === 'pensione' ? '🌙 Pensione archiviate' : '☀️ Asilo archiviate'}
+                      description={`${filteredArchive.filter(b => tab === 'all' || b.serviceType === tab).length} prenotazioni concluse`}
+                      bookings={filteredArchive.filter(b => tab === 'all' || b.serviceType === tab)}
+                      accentClass={tab === 'pensione' ? 'border-l-4 border-l-indigo-300 opacity-90' : tab === 'asilo' ? 'border-l-4 border-l-amber-300 opacity-90' : 'border-l-4 border-l-gray-300 opacity-90'}
+                      badgeClass="bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      deleteIsPending={deleteBookingMutation.isPending}
+                    />
+                  </TabsContent>
+                ))}
               </Tabs>
             )}
           </TabsContent>
