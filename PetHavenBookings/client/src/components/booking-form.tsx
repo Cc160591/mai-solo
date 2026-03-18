@@ -30,14 +30,15 @@ const DAY_NAMES_FULL = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Gioved
 
 function generateRecurringDates(startFromDate: string, selectedDays: number[], numWeeks: number): string[] {
   const dates: string[] = [];
-  const start = new Date(startFromDate);
+  const [year, month, day] = startFromDate.split('-').map(Number);
+  // Use local-time constructor to avoid UTC/DST offset issues
+  const start = new Date(year, month - 1, day);
   start.setDate(start.getDate() - start.getDay());
 
   for (let week = 0; week < numWeeks; week++) {
-    for (const day of selectedDays) {
-      const d = new Date(start);
-      d.setDate(d.getDate() + week * 7 + day);
-      const dateStr = d.toISOString().split('T')[0];
+    for (const dayOfWeek of selectedDays) {
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + week * 7 + dayOfWeek);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       if (dateStr >= startFromDate) {
         dates.push(dateStr);
       }
