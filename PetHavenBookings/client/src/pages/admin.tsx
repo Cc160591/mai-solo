@@ -514,54 +514,57 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            <h1 className="text-xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
               Dashboard Amministrativa
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
               Centro Cinofilo Mai Solo
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {notifications.length > 0 && (
               <Button
                 variant="outline"
                 onClick={() => setNotifications([])}
                 data-testid="button-clear-notifications"
+                size="sm"
               >
-                <Bell className="h-4 w-4 mr-2" />
-                {notifications.length} nuove
+                <Bell className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">{notifications.length} nuove</span>
               </Button>
             )}
             <Button
               variant="outline"
               onClick={() => setLocation("/")}
               data-testid="button-view-calendar"
+              size="sm"
             >
-              <Calendar className="h-4 w-4 mr-2" />
-              Visualizza Calendario
+              <Calendar className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Visualizza Calendario</span>
             </Button>
             <Button
               variant="outline"
               onClick={() => logoutMutation.mutate()}
               disabled={logoutMutation.isPending}
               data-testid="button-logout"
+              size="sm"
             >
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
+              <LogOut className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Logout</span>
             </Button>
           </div>
         </div>
 
         <Tabs defaultValue="bookings" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="bookings" data-testid="tab-bookings">
+          <TabsList className="w-full sm:w-auto overflow-x-auto">
+            <TabsTrigger value="bookings" data-testid="tab-bookings" className="text-xs sm:text-sm">
               Prenotazioni
             </TabsTrigger>
-            <TabsTrigger value="archive" data-testid="tab-archive">
-              <Archive className="h-4 w-4 mr-1" />
+            <TabsTrigger value="archive" data-testid="tab-archive" className="text-xs sm:text-sm">
+              <Archive className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
               Archivio
               {archivedBookings.length > 0 && (
                 <span className="ml-1.5 bg-muted text-muted-foreground text-xs px-1.5 py-0.5 rounded-full">
@@ -569,11 +572,11 @@ export default function AdminDashboard() {
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="closures" data-testid="tab-closures">
+            <TabsTrigger value="closures" data-testid="tab-closures" className="text-xs sm:text-sm">
               Chiusure
             </TabsTrigger>
-            <TabsTrigger value="capacity" data-testid="tab-capacity">
-              Posti Disponibili
+            <TabsTrigger value="capacity" data-testid="tab-capacity" className="text-xs sm:text-sm">
+              Posti
             </TabsTrigger>
           </TabsList>
 
@@ -591,9 +594,10 @@ export default function AdminDashboard() {
               <Button
                 onClick={() => { resetNewForm(); setShowNewDialog(true); }}
                 data-testid="button-new-booking"
+                size="sm"
               >
-                <PlusCircle className="h-4 w-4 mr-2" />
-                Nuova Prenotazione
+                <PlusCircle className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Nuova Prenotazione</span>
               </Button>
             </div>
 
