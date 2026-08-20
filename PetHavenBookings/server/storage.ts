@@ -1,4 +1,4 @@
-import { type Booking, type InsertBooking, bookings, type Closure, type InsertClosure, closures, type CapacityOverride, type InsertCapacityOverride, capacityOverrides } from "@shared/schema";
+import { type Booking, type InsertBooking, bookings, type Closure, type InsertClosure, closures, type CapacityOverride, type InsertCapacityOverride, capacityOverrides, isMorningEntry, isAfternoonEntry, isAfternoonExit } from "@shared/schema";
 import { database } from "./database";
 import { eq, and, gte, lte, sql, asc } from "drizzle-orm";
 
@@ -107,9 +107,9 @@ export class SQLiteStorage implements IStorage {
     const morningCapacity = override ? override.morningCapacity : 9;
     const afternoonCapacity = override ? override.afternoonCapacity : 9;
 
-    // Count bookings for morning (7:30 or 8:00-9:00) and afternoon (13:30-14:00)
     // Pensione occupies both morning and afternoon
     // Asilo that enters in morning and exits in afternoon occupies both slots
+    // Le mezze giornate esistono solo nelle prenotazioni fino al 31/08/2026
     let morningOccupied = 0;
     let afternoonOccupied = 0;
 
@@ -118,14 +118,14 @@ export class SQLiteStorage implements IStorage {
         // Pensione always occupies both slots
         morningOccupied++;
         afternoonOccupied++;
-      } else if ((booking.entryTime === '7:30' || booking.entryTime === '8:00-9:00') && booking.exitTime === '17:00-18:00') {
-        // Asilo: enters in morning (7:30 or 8:00-9:00) and exits in afternoon = occupies both slots
+      } else if (isMorningEntry(booking.entryTime) && isAfternoonExit(booking.exitTime)) {
+        // Asilo a giornata intera = occupa entrambi gli slot
         morningOccupied++;
         afternoonOccupied++;
-      } else if (booking.entryTime === '7:30' || booking.entryTime === '8:00-9:00') {
+      } else if (isMorningEntry(booking.entryTime)) {
         // Asilo: enters and exits in morning = only morning slot
         morningOccupied++;
-      } else if (booking.entryTime === '13:30-14:00') {
+      } else if (isAfternoonEntry(booking.entryTime)) {
         // Asilo: enters and exits in afternoon = only afternoon slot
         afternoonOccupied++;
       }

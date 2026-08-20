@@ -21,7 +21,18 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertBookingSchema, type Booking, type InsertBooking } from "@shared/schema";
+import {
+  insertBookingSchema,
+  adminBookingSchema,
+  entrySlotsForDate,
+  exitSlotsForDate,
+  entrySlotOptionsWithCurrent,
+  exitSlotOptionsWithCurrent,
+  type Booking,
+  type InsertBooking,
+  type EntrySlot,
+  type ExitSlot,
+} from "@shared/schema";
 import { ClosuresManagement } from "@/components/closures-management";
 import { CapacityOverrides } from "@/components/capacity-overrides";
 import { cn } from "@/lib/utils";
@@ -298,7 +309,7 @@ export default function AdminDashboard() {
   });
 
   const editForm = useForm<InsertBooking>({
-    resolver: zodResolver(insertBookingSchema),
+    resolver: zodResolver(adminBookingSchema),
     defaultValues: {
       dogName: '',
       ownerName: '',
@@ -307,7 +318,7 @@ export default function AdminDashboard() {
       startDate: '',
       endDate: '',
       entryTime: '7:30',
-      exitTime: '11:30-12:00',
+      exitTime: '8:00-9:00',
       exactEntryTime: '',
       exactExitTime: '',
     },
@@ -327,7 +338,7 @@ export default function AdminDashboard() {
       startDate: minDate,
       endDate: minDate,
       entryTime: '7:30',
-      exitTime: '11:30-12:00',
+      exitTime: '8:00-9:00',
       exactEntryTime: '',
       exactExitTime: '',
     },
@@ -342,6 +353,27 @@ export default function AdminDashboard() {
     return generateRecurringDates(effectiveRecurringStart, selectedDays, numWeeks);
   }, [isRecurring, selectedDays, numWeeks, effectiveRecurringStart]);
 
+  // Nuova prenotazione: valgono le stesse regole del form pubblico. Su una serie
+  // ricorrente decide la data più avanzata, perché le fasce si applicano a tutte.
+  const newSlotDate = isRecurring && recurringDates.length > 0
+    ? recurringDates[recurringDates.length - 1]
+    : (newForm.watch('startDate') || minDate);
+  const newSlotExitDate = isRecurring && recurringDates.length > 0
+    ? recurringDates[recurringDates.length - 1]
+    : (newForm.watch('endDate') || newSlotDate);
+  const newEntryOptions = entrySlotsForDate(newSlotDate);
+  const newExitOptions = exitSlotsForDate(newSlotExitDate);
+
+  // Modifica: opzioni della data, più il valore storico già salvato.
+  const editEntryOptions = entrySlotOptionsWithCurrent(
+    editForm.watch('startDate') || '',
+    editForm.watch('entryTime'),
+  );
+  const editExitOptions = exitSlotOptionsWithCurrent(
+    editForm.watch('endDate') || '',
+    editForm.watch('exitTime'),
+  );
+
   const resetNewForm = () => {
     newForm.reset({
       dogName: '',
@@ -351,7 +383,7 @@ export default function AdminDashboard() {
       startDate: minDate,
       endDate: minDate,
       entryTime: '7:30',
-      exitTime: '11:30-12:00',
+      exitTime: '8:00-9:00',
       exactEntryTime: '',
       exactExitTime: '',
     });
@@ -406,6 +438,20 @@ export default function AdminDashboard() {
     }
   }, [isRecurring, recurringDates, newForm]);
 
+  // Se la data porta la nuova prenotazione oltre il 1° settembre, una fascia già
+  // selezionata può non essere più valida: si riporta sulla prima disponibile.
+  useEffect(() => {
+    if (!newEntryOptions.includes(newForm.getValues('entryTime') as EntrySlot)) {
+      newForm.setValue('entryTime', newEntryOptions[0]);
+    }
+  }, [newEntryOptions, newForm]);
+
+  useEffect(() => {
+    if (!newExitOptions.includes(newForm.getValues('exitTime') as ExitSlot)) {
+      newForm.setValue('exitTime', newExitOptions[0]);
+    }
+  }, [newExitOptions, newForm]);
+
   if (isAdminStatusLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -436,8 +482,8 @@ export default function AdminDashboard() {
       serviceType: booking.serviceType as 'asilo' | 'pensione',
       startDate: booking.startDate,
       endDate: booking.endDate || booking.startDate,
-      entryTime: booking.entryTime as '7:30' | '8:00-9:00' | '13:30-14:00',
-      exitTime: booking.exitTime as '8:00-9:00' | '11:30-12:00' | '17:00-18:00',
+      entryTime: booking.entryTime as EntrySlot,
+      exitTime: booking.exitTime as ExitSlot,
       exactEntryTime: booking.exactEntryTime || '',
       exactExitTime: booking.exactExitTime || '',
     });
@@ -468,8 +514,8 @@ export default function AdminDashboard() {
         ownerName: data.ownerName,
         email: data.email,
         serviceType: data.serviceType as 'asilo' | 'pensione',
-        entryTime: data.entryTime as '7:30' | '8:00-9:00' | '13:30-14:00',
-        exitTime: data.exitTime as '8:00-9:00' | '11:30-12:00' | '17:00-18:00',
+        entryTime: data.entryTime as EntrySlot,
+        exitTime: data.exitTime as ExitSlot,
         exactEntryTime: data.exactEntryTime,
         exactExitTime: data.exactExitTime,
         dates: recurringDates,
@@ -822,9 +868,9 @@ export default function AdminDashboard() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="7:30">7:30</SelectItem>
-                            <SelectItem value="8:00-9:00">8:00-9:00</SelectItem>
-                            <SelectItem value="13:30-14:00">13:30-14:00</SelectItem>
+                            {editEntryOptions.map((time) => (
+                              <SelectItem key={time} value={time}>{time}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -845,8 +891,9 @@ export default function AdminDashboard() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="11:30-12:00">11:30-12:00</SelectItem>
-                            <SelectItem value="17:00-18:00">17:00-18:00</SelectItem>
+                            {editExitOptions.map((time) => (
+                              <SelectItem key={time} value={time}>{time}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -1031,9 +1078,9 @@ export default function AdminDashboard() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="7:30">7:30</SelectItem>
-                            <SelectItem value="8:00-9:00">8:00-9:00</SelectItem>
-                            <SelectItem value="13:30-14:00">13:30-14:00</SelectItem>
+                            {newEntryOptions.map((time) => (
+                              <SelectItem key={time} value={time}>{time}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -1054,9 +1101,9 @@ export default function AdminDashboard() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="8:00-9:00">8:00-9:00</SelectItem>
-                            <SelectItem value="11:30-12:00">11:30-12:00</SelectItem>
-                            <SelectItem value="17:00-18:00">17:00-18:00</SelectItem>
+                            {newExitOptions.map((time) => (
+                              <SelectItem key={time} value={time}>{time}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormMessage />

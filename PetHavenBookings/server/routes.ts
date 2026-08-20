@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { insertBookingSchema, batchBookingSchema, type InsertBooking, type Booking, insertClosureSchema, insertClosureRangeSchema, insertCapacityOverrideSchema } from "@shared/schema";
+import { insertBookingSchema, batchBookingSchema, type InsertBooking, type Booking, insertClosureSchema, insertClosureRangeSchema, insertCapacityOverrideSchema, ALL_ENTRY_SLOTS, ALL_EXIT_SLOTS, FULL_DAY_ENTRY_SLOTS, FULL_DAY_EXIT_SLOTS, entrySlotsForDate, exitSlotsForDate, isMorningEntry, isAfternoonEntry, isAfternoonExit } from "@shared/schema";
 import { requireAdmin, checkAdminPassword } from "./auth";
 import { z } from "zod";
 import { sendBookingNotification, sendBookingConfirmation, sendBatchBookingConfirmation } from "./email";
@@ -222,14 +222,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
         } else {
-          // Asilo: check the specific time slot
-          if ((bookingData.entryTime === '7:30' || bookingData.entryTime === '8:00-9:00') && morning < 1) {
-            return res.status(409).json({ 
-              message: `Non ci sono posti disponibili per la mattina del ${checkDate}` 
+          // Asilo: controlla gli slot effettivamente occupati. A giornata intera
+          // (entrata mattina + uscita pomeriggio) servono entrambi.
+          const occupiesMorning = isMorningEntry(bookingData.entryTime);
+          const occupiesAfternoon = isAfternoonEntry(bookingData.entryTime)
+            || (occupiesMorning && isAfternoonExit(bookingData.exitTime));
+
+          if (occupiesMorning && morning < 1) {
+            return res.status(409).json({
+              message: `Non ci sono posti disponibili per la mattina del ${checkDate}`
             });
-          } else if (bookingData.entryTime === '13:30-14:00' && afternoon < 1) {
-            return res.status(409).json({ 
-              message: `Non ci sono posti disponibili per il pomeriggio del ${checkDate}` 
+          } else if (occupiesAfternoon && afternoon < 1) {
+            return res.status(409).json({
+              message: `Non ci sono posti disponibili per il pomeriggio del ${checkDate}`
             });
           }
         }
@@ -319,10 +324,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
         } else {
-          if ((bookingBase.entryTime === '7:30' || bookingBase.entryTime === '8:00-9:00') && morning < 1) {
+          const occupiesMorning = isMorningEntry(bookingBase.entryTime);
+          const occupiesAfternoon = isAfternoonEntry(bookingBase.entryTime)
+            || (occupiesMorning && isAfternoonExit(bookingBase.exitTime));
+
+          if (occupiesMorning && morning < 1) {
             skipped.push({ date, reason: "Nessun posto disponibile per la mattina" });
             continue;
-          } else if (bookingBase.entryTime === '13:30-14:00' && afternoon < 1) {
+          } else if (occupiesAfternoon && afternoon < 1) {
             skipped.push({ date, reason: "Nessun posto disponibile per il pomeriggio" });
             continue;
           }
@@ -461,12 +470,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         serviceType: z.enum(['asilo', 'pensione']).optional(),
         startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
         endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-        entryTime: z.enum(['7:30', '8:00-9:00', '13:30-14:00']).optional(),
-        exitTime: z.enum(['8:00-9:00', '11:30-12:00', '17:00-18:00']).optional(),
+        // L'admin accetta tutte le fasce, comprese quelle storiche: deve poter
+        // correggere le prenotazioni registrate prima del 1° settembre 2026.
+        entryTime: z.enum(ALL_ENTRY_SLOTS).optional(),
+        exitTime: z.enum(ALL_EXIT_SLOTS).optional(),
         exactEntryTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
         exactExitTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
       });
-      
+
       const validationResult = partialBookingSchema.safeParse(req.body);
       if (!validationResult.success) {
         return res.status(400).json({
@@ -507,13 +518,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const partialSchema = z.object({
-        entryTime: z.enum(['7:30', '8:00-9:00', '13:30-14:00']).optional(),
-        exitTime: z.enum(['8:00-9:00', '11:30-12:00', '17:00-18:00']).optional(),
+        entryTime: z.enum(ALL_ENTRY_SLOTS).optional(),
+        exitTime: z.enum(ALL_EXIT_SLOTS).optional(),
         exactEntryTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
         exactExitTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
       });
       const validation = partialSchema.safeParse(updateData);
       if (!validation.success) return res.status(400).json({ message: "Dati non validi" });
+
+      // Il cliente può scegliere solo le fasce ammesse per le date della sua
+      // prenotazione: dal 1° settembre 2026 restano quelle a giornata intera.
+      const { entryTime, exitTime } = validation.data;
+      if (entryTime && !entrySlotsForDate(existingBooking.startDate).includes(entryTime)) {
+        return res.status(400).json({
+          message: `Fascia di entrata non disponibile per questa data. Dal 1° settembre si prenota solo a giornata intera: ${FULL_DAY_ENTRY_SLOTS.join(' o ')}.`,
+        });
+      }
+      if (exitTime && !exitSlotsForDate(existingBooking.endDate).includes(exitTime)) {
+        return res.status(400).json({
+          message: `Fascia di uscita non disponibile per questa data. Dal 1° settembre si prenota solo a giornata intera: ${FULL_DAY_EXIT_SLOTS.join(' o ')}.`,
+        });
+      }
 
       const booking = await storage.updateBooking(id, validation.data);
       res.json(booking);
