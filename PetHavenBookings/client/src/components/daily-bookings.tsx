@@ -10,6 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import {
+  entrySlotsForDate,
+  exitSlotsForDate,
+  entrySlotOptionsWithCurrent,
+  exitSlotOptionsWithCurrent,
+} from "@shared/schema";
 
 interface DailyBookingsProps {
   selectedDate: string;
@@ -128,6 +134,19 @@ export default function DailyBookings({ selectedDate, isAdmin = false }: DailyBo
       exactExitTime: booking.exactExitTime || '',
     });
   };
+
+  // L'admin vede anche la fascia storica già salvata e può lasciarla invariata;
+  // il cliente sceglie solo fra quelle ammesse per le date della prenotazione.
+  const editEntryOptions = editingBooking
+    ? (isAdmin
+        ? entrySlotOptionsWithCurrent(editingBooking.startDate, editingBooking.entryTime)
+        : [...entrySlotsForDate(editingBooking.startDate)])
+    : [];
+  const editExitOptions = editingBooking
+    ? (isAdmin
+        ? exitSlotOptionsWithCurrent(editingBooking.endDate || editingBooking.startDate, editingBooking.exitTime)
+        : [...exitSlotsForDate(editingBooking.endDate || editingBooking.startDate)])
+    : [];
 
   const submitEdit = () => {
     if (!editingBooking) return;
@@ -315,22 +334,22 @@ export default function DailyBookings({ selectedDate, isAdmin = false }: DailyBo
                 <div className="space-y-2">
                   <Label>Fascia entrata</Label>
                   <Select value={editForm.entryTime} onValueChange={(v) => setEditForm(f => ({ ...f, entryTime: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Seleziona fascia" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="7:30">7:30</SelectItem>
-                      <SelectItem value="8:00-9:00">8:00-9:00</SelectItem>
-                      <SelectItem value="13:30-14:00">13:30-14:00</SelectItem>
+                      {editEntryOptions.map((time) => (
+                        <SelectItem key={time} value={time}>{time}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Fascia uscita</Label>
                   <Select value={editForm.exitTime} onValueChange={(v) => setEditForm(f => ({ ...f, exitTime: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Seleziona fascia" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="8:00-9:00">8:00-9:00</SelectItem>
-                      <SelectItem value="11:30-12:00">11:30-12:00</SelectItem>
-                      <SelectItem value="17:00-18:00">17:00-18:00</SelectItem>
+                      {editExitOptions.map((time) => (
+                        <SelectItem key={time} value={time}>{time}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

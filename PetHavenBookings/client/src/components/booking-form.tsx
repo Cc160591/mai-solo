@@ -3,7 +3,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { api, type BatchBookingResult } from "@/lib/api";
-import { insertBookingSchema, type InsertBooking, type Booking } from "@shared/schema";
+import {
+  insertBookingSchema,
+  entrySlotsForDate,
+  exitSlotsForDate,
+  type InsertBooking,
+  type Booking,
+  type EntrySlot,
+  type ExitSlot,
+} from "@shared/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -19,11 +27,6 @@ import { checkClosureConflicts, formatShortDate } from "@shared/utils";
 interface BookingFormProps {
   selectedDate: string;
 }
-
-const timeSlots = {
-  entry: ['7:30', '8:00-9:00', '13:30-14:00'] as const,
-  exit: ['8:00-9:00', '11:30-12:00', '17:00-18:00'] as const,
-};
 
 const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
 const DAY_NAMES_FULL = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
@@ -102,6 +105,19 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
   const effectiveStartDate = isRecurring && recurringDates.length > 0 ? recurringDates[0] : formStartDate;
   const effectiveEndDate = isRecurring && recurringDates.length > 0 ? recurringDates[recurringDates.length - 1] : formEndDate;
 
+  // Le fasce disponibili dipendono dalla data: dal 1° settembre 2026 restano
+  // solo quelle a giornata intera. Su una serie ricorrente valgono le regole
+  // della data più avanzata, perché le fasce scelte si applicano a tutte.
+  const slotReferenceDate = isRecurring && recurringDates.length > 0
+    ? recurringDates[recurringDates.length - 1]
+    : (effectiveStartDate || selectedDate);
+  const slotExitReferenceDate = isRecurring && recurringDates.length > 0
+    ? recurringDates[recurringDates.length - 1]
+    : (effectiveEndDate || effectiveStartDate || selectedDate);
+
+  const entryOptions = entrySlotsForDate(slotReferenceDate);
+  const exitOptions = exitSlotsForDate(slotExitReferenceDate);
+
   const { data: closures } = useQuery<any[]>({
     queryKey: ["/api/closures/range", effectiveStartDate, effectiveEndDate],
     queryFn: async () => {
@@ -135,6 +151,21 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
       form.setValue('endDate', startDate);
     }
   }, [formStartDate, form]);
+
+  // Se la data scelta cambia regime, una fascia selezionata può non essere più
+  // valida: si riporta sulla prima disponibile invece di lasciare il form in
+  // uno stato che il server rifiuterebbe.
+  useEffect(() => {
+    if (!entryOptions.includes(formEntryTime as EntrySlot)) {
+      form.setValue('entryTime', entryOptions[0]);
+    }
+  }, [entryOptions, formEntryTime, form]);
+
+  useEffect(() => {
+    if (!exitOptions.includes(formExitTime as ExitSlot)) {
+      form.setValue('exitTime', exitOptions[0]);
+    }
+  }, [exitOptions, formExitTime, form]);
 
   const createBookingMutation = useMutation({
     mutationFn: api.createBooking,
@@ -232,8 +263,8 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
         ownerName: data.ownerName,
         email: data.email,
         serviceType: data.serviceType as 'asilo' | 'pensione',
-        entryTime: data.entryTime as '7:30' | '8:00-9:00' | '13:30-14:00',
-        exitTime: data.exitTime as '8:00-9:00' | '11:30-12:00' | '17:00-18:00',
+        entryTime: data.entryTime as EntrySlot,
+        exitTime: data.exitTime as ExitSlot,
         exactEntryTime: data.exactEntryTime,
         exactExitTime: data.exactExitTime,
         dates: recurringDates,
@@ -631,8 +662,8 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Fascia Oraria di Entrata <span className="text-destructive">*</span></FormLabel>
-                    <div className="grid grid-cols-3 gap-3">
-                      {timeSlots.entry.map((time) => (
+                    <div className={cn("grid gap-3", entryOptions.length === 2 ? "grid-cols-2" : "grid-cols-3")}>
+                      {entryOptions.map((time) => (
                         <TimeSlotButton
                           key={time}
                           value={time}
@@ -680,8 +711,8 @@ export default function BookingForm({ selectedDate }: BookingFormProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Fascia Oraria di Uscita <span className="text-destructive">*</span></FormLabel>
-                    <div className="grid grid-cols-3 gap-3">
-                      {timeSlots.exit.map((time) => (
+                    <div className={cn("grid gap-3", exitOptions.length === 2 ? "grid-cols-2" : "grid-cols-3")}>
+                      {exitOptions.map((time) => (
                         <TimeSlotButton
                           key={time}
                           value={time}

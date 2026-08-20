@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, BookOpen, Calendar, Clock, Dog, User, Search, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { entrySlotsForDate, exitSlotsForDate } from "@shared/schema";
 
 interface Booking {
   id: number;
@@ -112,6 +113,13 @@ export default function MyBookings() {
       exactExitTime: booking.exactExitTime || '',
     });
   };
+
+  // Il cliente può scegliere solo le fasce ammesse per le date della sua
+  // prenotazione: dal 1° settembre 2026 restano quelle a giornata intera.
+  const editEntryOptions = editingBooking ? entrySlotsForDate(editingBooking.startDate) : [];
+  const editExitOptions = editingBooking
+    ? exitSlotsForDate(editingBooking.endDate || editingBooking.startDate)
+    : [];
 
   const submitEdit = () => {
     if (!editingBooking) return;
@@ -311,22 +319,22 @@ export default function MyBookings() {
                 <div className="space-y-2">
                   <Label>Fascia entrata</Label>
                   <Select value={editForm.entryTime} onValueChange={(v) => setEditForm(f => ({ ...f, entryTime: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Seleziona fascia" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="7:30">7:30</SelectItem>
-                      <SelectItem value="8:00-9:00">8:00-9:00</SelectItem>
-                      <SelectItem value="13:30-14:00">13:30-14:00</SelectItem>
+                      {editEntryOptions.map((time) => (
+                        <SelectItem key={time} value={time}>{time}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Fascia uscita</Label>
                   <Select value={editForm.exitTime} onValueChange={(v) => setEditForm(f => ({ ...f, exitTime: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Seleziona fascia" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="8:00-9:00">8:00-9:00</SelectItem>
-                      <SelectItem value="11:30-12:00">11:30-12:00</SelectItem>
-                      <SelectItem value="17:00-18:00">17:00-18:00</SelectItem>
+                      {editExitOptions.map((time) => (
+                        <SelectItem key={time} value={time}>{time}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
