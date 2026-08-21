@@ -22,7 +22,7 @@ const tourSteps: TourStep[] = [
   {
     targetSelector: "[data-tour-step='calendar']",
     title: "Calendario Disponibilit\u00e0",
-    description: "Qui vedi la disponibilit\u00e0 per ogni giorno. Ogni giorno \u00e8 diviso in Mattina (M) e Pomeriggio (P). I colori indicano i posti liberi: verde = tanti posti, giallo = pochi, rosso = quasi pieno, grigio = completo. Clicca su un giorno per selezionarlo.",
+    description: "Qui vedi la disponibilit\u00e0 per ogni giorno. Le prenotazioni sono a giornata intera. I colori indicano i posti liberi: verde = tanti posti, giallo = pochi, rosso = quasi pieno, grigio = completo. Clicca su un giorno per selezionarlo.",
     icon: <CalendarDays className="w-6 h-6" />,
     position: "right",
   },

@@ -141,7 +141,7 @@ export default function Calendar({ selectedDate, onDateSelect }: CalendarProps) 
             </div>
           </div>
           <div className="text-xs text-muted-foreground">
-            Ogni giorno mostra disponibilità per mattina (M) e pomeriggio (P)
+            Ogni giorno mostra i posti disponibili per la giornata intera
           </div>
         </div>
       </div>
@@ -175,6 +175,11 @@ export default function Calendar({ selectedDate, onDateSelect }: CalendarProps) 
             const hasPensioneClosure = closures.some((c: any) => c.type === 'pensione' || c.type === 'both');
             // A day is fully closed if there's a 'both' closure OR if there are separate asilo and pensione closures
             const hasFullClosure = closures.some((c: any) => c.type === 'both') || (hasAsiloClosure && hasPensioneClosure);
+            // Un solo servizio chiuso: la casella resta prenotabile per l'altro
+            const hasPartialClosure = !hasFullClosure && (hasAsiloClosure || hasPensioneClosure);
+            // A giornata intera i due valori coincidono; il minimo protegge dai
+            // dati storici in cui una mezza giornata li aveva resi diversi.
+            const availableSpots = Math.min(morning, afternoon);
             
             return (
               <div
@@ -214,53 +219,32 @@ export default function Calendar({ selectedDate, onDateSelect }: CalendarProps) 
                       </span>
                     </div>
                   ) : (
-                    <>
-                      {/* Morning (top half) */}
-                      <div className={cn(
-                        "h-1/2 flex items-center justify-center border-b border-border/50",
-                        hasAsiloClosure ? "bg-red-100 dark:bg-red-950/50" : "bg-white/50"
-                      )}>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[9px] text-muted-foreground font-medium">M</span>
-                          {hasAsiloClosure ? (
-                            <span className="text-[10px] font-bold text-red-600 dark:text-red-400">✕</span>
-                          ) : (
-                            <span 
-                              className={cn(
-                                "w-5 h-5 rounded-full text-white text-[10px] flex items-center justify-center font-bold",
-                                getAvailabilityColor(morning)
-                              )}
-                              data-testid={`availability-morning-${date}`}
-                            >
-                              {isLoading ? "?" : morning}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Afternoon (bottom half) */}
-                      <div className={cn(
-                        "h-1/2 flex items-center justify-center",
-                        hasPensioneClosure ? "bg-red-100 dark:bg-red-950/50" : "bg-white/30"
-                      )}>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[9px] text-muted-foreground font-medium">P</span>
-                          {hasPensioneClosure ? (
-                            <span className="text-[10px] font-bold text-red-600 dark:text-red-400">✕</span>
-                          ) : (
-                            <span 
-                              className={cn(
-                                "w-5 h-5 rounded-full text-white text-[10px] flex items-center justify-center font-bold",
-                                getAvailabilityColor(afternoon)
-                              )}
-                              data-testid={`availability-afternoon-${date}`}
-                            >
-                              {isLoading ? "?" : afternoon}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </>
+                    // Le prenotazioni sono a giornata intera: mattina e pomeriggio
+                    // hanno sempre gli stessi posti liberi, quindi si mostra un
+                    // solo numero. Se un servizio è chiuso ma l'altro no, lo si
+                    // dice per esteso invece di dividere la casella in due.
+                    <div className={cn(
+                      "h-full flex flex-col items-center justify-center gap-0.5 pt-3",
+                      hasPartialClosure ? "bg-red-100 dark:bg-red-950/50" : "bg-white/50"
+                    )}>
+                      <span
+                        className={cn(
+                          "w-6 h-6 rounded-full text-white text-[11px] flex items-center justify-center font-bold",
+                          getAvailabilityColor(availableSpots)
+                        )}
+                        data-testid={`availability-${date}`}
+                      >
+                        {isLoading ? "?" : availableSpots}
+                      </span>
+                      {hasPartialClosure ? (
+                        <span className="text-[9px] leading-tight text-center font-medium text-red-600 dark:text-red-400">
+                          {hasAsiloClosure ? "Asilo" : "Pensione"}
+                          <br />chiuso
+                        </span>
+                      ) : (
+                        <span className="text-[9px] text-muted-foreground">posti</span>
+                      )}
+                    </div>
                   )
                 ) : (
                   <div className="h-full"></div>
